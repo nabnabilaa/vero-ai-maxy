@@ -1,0 +1,1042 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useStore } from '@/lib/store';
+import { useDropzone } from 'react-dropzone';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// AI generation now handled via /api/ai/generate server endpoint (Groq)
+import { Sparkles, Save, Loader2, ArrowLeft, Lightbulb, Wand2, ChevronDown, MapPin, BookOpen, Plus, X, CheckCircle, Upload, FileText, Search, Map, ExternalLink, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'motion/react';
+
+type TopicField = { key: string; label: string; placeholder: string; type: 'text' | 'textarea' | 'url'; mapCategory?: string };
+
+// ============================================================
+// Topic templates per industry — defines what knowledge to collect
+// ============================================================
+const TOPIC_TEMPLATES: Record<string, { label: string; icon: string; topics: { value: string; label: string; description: string; fields: { key: string; label: string; placeholder: string; type: 'text' | 'textarea' | 'url'; mapCategory?: string }[] }[] }> = {
+  Hotel: {
+    label: 'Hotel', icon: '🏨',
+    topics: [
+      {
+        value: 'nearby_food', label: 'Rekomendasi Makanan Sekitar', description: 'AI akan merekomendasikan tempat makan di sekitar hotel',
+        fields: [
+          { key: 'restaurant_list', label: 'Daftar Restoran/Warung Terdekat', placeholder: 'Contoh:\n1. Warung Nasi Padang Sari Bundo — 200m, Halal, Rp15.000-30.000\n2. Restoran Korea Kimchi House — 500m, Non-Halal, Rp50.000-100.000\n3. Kedai Kopi Lokal — 100m, Rp10.000-25.000', type: 'textarea', mapCategory: 'food' },
+          { key: 'hotel_restaurant', label: 'Restaurant di Hotel', placeholder: 'Contoh: Sky Lounge Rooftop — Buka 07:00-22:00, Menu buffet Rp150.000/orang', type: 'textarea' },
+        ]
+      },
+      {
+        value: 'nearby_attractions', label: 'Tempat Wisata Sekitar', description: 'AI akan merekomendasikan objek wisata dan hiburan sekitar',
+        fields: [
+          { key: 'attractions', label: 'Daftar Tempat Wisata', placeholder: 'Contoh:\n1. Pantai Kuta — 2km, tiket gratis, buka 24 jam\n2. Museum Seni — 500m, tiket Rp25.000, buka 09:00-17:00', type: 'textarea', mapCategory: 'attraction' },
+          { key: 'transport', label: 'Transportasi yang Tersedia', placeholder: 'Contoh: Grab/Gojek, shuttle hotel gratis ke mall, rental motor Rp75.000/hari', type: 'textarea' },
+        ]
+      },
+      {
+        value: 'room_service', label: 'Room Service & Fasilitas', description: 'AI akan menjawab pertanyaan tentang kamar dan fasilitas hotel',
+        fields: [
+          { key: 'room_types', label: 'Tipe Kamar & Harga', placeholder: 'Contoh:\n- Standard Room: Rp500.000/malam, 1 King Bed, WiFi, AC\n- Deluxe: Rp800.000/malam, 1 King Bed, Balcony, Minibar\n- Suite: Rp1.500.000/malam, Living Room, Jacuzzi', type: 'textarea' },
+          { key: 'facilities', label: 'Fasilitas Hotel', placeholder: 'Contoh: Swimming Pool (07:00-21:00), Gym (24 jam), Spa (10:00-20:00), Laundry', type: 'textarea' },
+          { key: 'checkin', label: 'Waktu Check-in/Check-out', placeholder: 'Check-in: 14:00, Check-out: 12:00, Early check-in tersedia dengan biaya tambahan', type: 'text' },
+        ]
+      },
+      {
+        value: 'concierge', label: 'Concierge Umum', description: 'AI menjawab segala pertanyaan tamu tentang hotel',
+        fields: [
+          { key: 'faq', label: 'FAQ / Pertanyaan Umum', placeholder: 'Contoh:\nQ: Apakah ada WiFi gratis?\nA: Ya, WiFi gratis tersedia di seluruh area hotel. Password: WELCOME2024\n\nQ: Bagaimana cara ke airport?\nA: Hotel menyediakan shuttle airport (Rp100.000/orang), pesan 4 jam sebelumnya', type: 'textarea' },
+          { key: 'policies', label: 'Kebijakan Hotel', placeholder: 'Contoh: No smoking policy, Pet friendly (Rp200.000 extra), Pembatalan gratis H-1', type: 'textarea' },
+        ]
+      },
+      {
+        value: 'custom', label: 'Topik Kustom', description: 'Buat topik agent sesuai kebutuhan Anda',
+        fields: [
+          { key: 'custom_knowledge', label: 'Knowledge Data', placeholder: 'Masukkan informasi yang relevan dengan topik agen ini...', type: 'textarea' },
+        ]
+      }
+    ]
+  },
+  Retail: {
+    label: 'Retail', icon: '🛒',
+    topics: [
+      {
+        value: 'product_catalog', label: 'Katalog Produk', description: 'AI menjawab pertanyaan tentang produk yang tersedia',
+        fields: [
+          { key: 'products', label: 'Daftar Produk', placeholder: 'Contoh:\n1. iPhone 15 Pro Max — Rp22.999.000, Unit Apple, Garansi 1 tahun\n2. Samsung S24 Ultra — Rp19.999.000, Garansi resmi', type: 'textarea' },
+          { key: 'categories', label: 'Kategori Produk', placeholder: 'Contoh: Smartphone, Laptop, Aksesoris, Smartwatch', type: 'text' },
+          { key: 'promos', label: 'Promo & Diskon Aktif', placeholder: 'Contoh: Diskon 20% untuk semua aksesoris, Cicilan 0% 12 bulan via BCA', type: 'textarea' },
+        ]
+      },
+      {
+        value: 'store_info', label: 'Info Toko & Pengiriman', description: 'AI menjawab tentang lokasi toko, jam buka, dan pengiriman',
+        fields: [
+          { key: 'branches', label: 'Cabang / Lokasi Toko', placeholder: 'Contoh:\n1. Cabang Sudirman — Jl. Sudirman No.12, buka 10:00-22:00\n2. Cabang Mall Grand — Lt.2 Unit 201, buka 10:00-21:30', type: 'textarea' },
+          { key: 'shipping', label: 'Info Pengiriman', placeholder: 'Contoh: JNE, J&T, SiCepat, Same-day delivery via GoSend', type: 'text' },
+          { key: 'return_policy', label: 'Kebijakan Pengembalian', placeholder: 'Contoh: Pengembalian dalam 7 hari, produk belum dibuka, sertakan nota', type: 'textarea' },
+        ]
+      },
+      {
+        value: 'custom', label: 'Topik Kustom', description: 'Buat topik agent sesuai kebutuhan',
+        fields: [
+          { key: 'custom_knowledge', label: 'Knowledge Data', placeholder: 'Masukkan informasi yang relevan...', type: 'textarea' },
+        ]
+      }
+    ]
+  },
+  Restaurant: {
+    label: 'Restaurant', icon: '🍽️',
+    topics: [
+      {
+        value: 'menu', label: 'Menu & Rekomendasi', description: 'AI membantu pelanggan memilih menu',
+        fields: [
+          { key: 'menu_items', label: 'Daftar Menu', placeholder: 'Contoh:\nAPPETIZER:\n- Sate Lilit Bali — Rp35.000, Pedas ringan\n- Salad Caesar — Rp28.000, Vegetarian\n\nMAIN COURSE:\n- Nasi Goreng Seafood — Rp55.000\n- Steak Wagyu 200gr — Rp250.000', type: 'textarea' },
+          { key: 'specialties', label: 'Menu Andalan / Chef Recommendation', placeholder: 'Contoh: Bebek Goreng Bumbu Bali (best seller), Paket Rijsttafel untuk 4 orang', type: 'textarea' },
+          { key: 'dietary', label: 'Opsi Diet / Alergi', placeholder: 'Tersedia: Vegetarian, Vegan, Gluten-free, Halal certified', type: 'text' },
+        ]
+      },
+      {
+        value: 'reservation', label: 'Reservasi & Info', description: 'AI membantu reservasi dan info restoran',
+        fields: [
+          { key: 'booking_info', label: 'Info Reservasi', placeholder: 'Contoh: Reservasi via WhatsApp 081234567890, minimal 2 jam sebelumnya, deposit Rp100.000 untuk grup >6 orang', type: 'textarea' },
+          { key: 'operating_hours', label: 'Jam Operasional', placeholder: 'Contoh: Senin-Kamis 11:00-22:00, Jumat-Minggu 11:00-23:00, Happy Hour 15:00-18:00', type: 'text' },
+          { key: 'capacity', label: 'Kapasitas & Area', placeholder: 'Contoh: Indoor 50 pax, Outdoor Garden 30 pax, Private Room 12 pax', type: 'text' },
+        ]
+      },
+      {
+        value: 'custom', label: 'Topik Kustom', description: 'Buat topik sesuai kebutuhan',
+        fields: [
+          { key: 'custom_knowledge', label: 'Knowledge Data', placeholder: 'Masukkan informasi yang relevan...', type: 'textarea' },
+        ]
+      }
+    ]
+  },
+  'Real Estate': {
+    label: 'Real Estate', icon: '🏠',
+    topics: [
+      {
+        value: 'property_listing', label: 'Listing Properti', description: 'AI membantu calon pembeli/penyewa menemukan properti',
+        fields: [
+          { key: 'properties', label: 'Daftar Properti', placeholder: 'Contoh:\n1. Rumah Bintaro Sektor 9 — Rp2.5M, 3KT/2KM, LT150/LB120, SHM\n2. Apartemen Sudirman Park — Rp8jt/bulan, Studio 28m², Full Furnished', type: 'textarea' },
+          { key: 'facilities_area', label: 'Fasilitas Area / Lingkungan', placeholder: 'Contoh: Dekat sekolah internasional, RS Pondok Indah 2km, akses tol langsung', type: 'textarea' },
+        ]
+      },
+      {
+        value: 'consultation', label: 'Konsultasi Properti', description: 'AI membantu konsultasi KPR, investasi, dll',
+        fields: [
+          { key: 'kpr_info', label: 'Info KPR & Pembayaran', placeholder: 'Contoh: Kerjasama KPR dengan BCA, Mandiri, BTN. DP mulai 10%, tenor 20 tahun', type: 'textarea' },
+          { key: 'faq', label: 'FAQ Properti', placeholder: 'Q: Dokumen apa saja yang diperlukan?\nA: KTP, NPWP, Slip gaji 3 bulan terakhir, Rekening koran', type: 'textarea' },
+        ]
+      },
+      {
+        value: 'custom', label: 'Topik Kustom', description: 'Buat topik sesuai kebutuhan',
+        fields: [
+          { key: 'custom_knowledge', label: 'Knowledge Data', placeholder: 'Masukkan informasi yang relevan...', type: 'textarea' },
+        ]
+      }
+    ]
+  },
+  General: {
+    label: 'General', icon: '⚡',
+    topics: [
+      {
+        value: 'customer_service', label: 'Customer Service', description: 'AI menjawab pertanyaan umum pelanggan',
+        fields: [
+          { key: 'faq', label: 'FAQ / Pertanyaan Umum', placeholder: 'Masukkan pertanyaan dan jawaban yang sering ditanyakan...', type: 'textarea' },
+          { key: 'contact_info', label: 'Info Kontak', placeholder: 'Contoh: WhatsApp 081234567890, Email support@company.com', type: 'text' },
+        ]
+      },
+      {
+        value: 'custom', label: 'Topik Kustom', description: 'Buat agent kustom sesuai kebutuhan',
+        fields: [
+          { key: 'custom_knowledge', label: 'Knowledge Data', placeholder: 'Masukkan informasi yang relevan dengan kebutuhan agen...', type: 'textarea' },
+        ]
+      }
+    ]
+  }
+};
+
+const LANGUAGES = [
+  { code: 'Indonesian', label: '🇮🇩 Bahasa Indonesia' },
+  { code: 'English', label: '🇺🇸 English' },
+  { code: 'Malay', label: '🇲🇾 Bahasa Melayu' },
+  { code: 'Thai', label: '🇹🇭 ภาษาไทย' },
+  { code: 'Vietnamese', label: '🇻🇳 Tiếng Việt' },
+  { code: 'Japanese', label: '🇯🇵 日本語' },
+  { code: 'Korean', label: '🇰🇷 한국어' },
+  { code: 'Chinese', label: '🇨🇳 中文' },
+  { code: 'Spanish', label: '🇪🇸 Español' },
+  { code: 'French', label: '🇫🇷 Français' },
+  { code: 'German', label: '🇩🇪 Deutsch' },
+  { code: 'Arabic', label: '🇸🇦 العربية' },
+  { code: 'Hindi', label: '🇮🇳 हिन्दी' },
+  { code: 'Portuguese', label: '🇧🇷 Português' },
+];
+
+type PlaceResult = {
+  name: string;
+  type: string;
+  cuisine: string;
+  address: string;
+  phone: string;
+  website: string;
+  opening_hours: string;
+  lat: number;
+  lon: number;
+  distance_km: number;
+  maps_url: string;
+};
+
+export default function AgentForm({ editId, onBack }: { editId?: string | null; onBack: () => void }) {
+  const { admin } = useStore();
+  const industry = admin?.industry || 'General';
+
+  const [agentConfig, setAgentConfig] = useState({
+    id: '',
+    name: '',
+    role: 'Assistant',
+    tone: 'Professional',
+    language: 'Indonesian',
+    voice_type: 'female',
+    instructions: '',
+    goal: '',
+    industry: industry,
+    topic: '',
+    is_active: 1,
+  });
+
+  const [knowledgeData, setKnowledgeData] = useState<Record<string, string>>({});
+  const [topicFiles, setTopicFiles] = useState<any[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(!!editId);
+  const [step, setStep] = useState<1 | 2 | 3>(editId ? 3 : 1); // Start at 3 for edit mode
+
+  // AI dynamic topic state
+  const [customTopicInput, setCustomTopicInput] = useState('');
+  const [aiGeneratedFields, setAiGeneratedFields] = useState<TopicField[]>([]);
+  const [isGeneratingFields, setIsGeneratingFields] = useState(false);
+  const [customTopicLabel, setCustomTopicLabel] = useState('');
+  const [generalInfo, setGeneralInfo] = useState<any>(null);
+  const [generalKnowledgeCount, setGeneralKnowledgeCount] = useState(0);
+
+  // Maps state
+  const [mapPlaces, setMapPlaces] = useState<PlaceResult[]>([]);
+  const [mapCoords, setMapCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
+  const [showMap, setShowMap] = useState<string | null>(null); // field key that has map open
+
+  // Dropzone for topic knowledge files
+  const onDropTopicFile = useCallback((acceptedFiles: File[]) => {
+    acceptedFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = btoa(new Uint8Array(reader.result as ArrayBuffer)
+          .reduce((data, byte) => data + String.fromCharCode(byte), ''));
+        setTopicFiles(prev => [...prev, { name: file.name, content: base64, mimeType: file.type }]);
+        toast.success(`${file.name} ditambahkan`);
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }, []);
+
+  const { getRootProps: getTopicDropProps, getInputProps: getTopicInputProps, isDragActive: isTopicDragActive } = useDropzone({ onDrop: onDropTopicFile });
+
+  const templates = TOPIC_TEMPLATES[industry] || TOPIC_TEMPLATES.General;
+  const presetTopic = templates.topics.find(t => t.value === agentConfig.topic);
+  // Merge preset fields with AI-generated fields
+  const selectedTopic = presetTopic ? presetTopic : (agentConfig.topic === '__ai_custom__' && aiGeneratedFields.length > 0 ? { value: '__ai_custom__', label: customTopicLabel, description: 'Topik kustom dari AI', fields: aiGeneratedFields } : null);
+  const selectedTopicFields: TopicField[] = selectedTopic?.fields || [];
+
+  // Load general info + general knowledge count
+  useEffect(() => {
+    fetch('/api/general-info', { cache: 'no-store' }).then(r => r.json()).then(data => {
+      // Handle NextResponse JSON wrapper if data.info exists
+      const parsedInfo = typeof data.info === 'string' ? JSON.parse(data.info) : data.info;
+      setGeneralInfo(parsedInfo || {});
+    }).catch(e => console.error(e));
+
+    fetch('/api/general-knowledge', { cache: 'no-store' }).then(r => r.json()).then(data => {
+      setGeneralKnowledgeCount(data.sources?.length || 0);
+    }).catch(e => console.error(e));
+  }, []);
+
+  // Load existing agent data
+  useEffect(() => {
+    if (editId) {
+      fetch('/api/agents').then(r => r.json()).then(data => {
+        const agent = data.agents?.find((a: any) => a.id === editId);
+        if (agent) {
+          setAgentConfig(agent);
+          fetch(`/api/knowledge?agentId=${editId}`).then(r => r.json()).then(kData => {
+            const existingData: Record<string, string> = {};
+            (kData.sources || []).forEach((s: any) => {
+              if (s.type === 'text') existingData[s.name] = s.content;
+            });
+            setKnowledgeData(existingData);
+
+            // Rehydrate custom AI fields if we are editing an AI topic
+            if (agent.topic === '__ai_custom__') {
+              setCustomTopicLabel(agent.name || 'Topik Kustom AI');
+              const customKeys = Object.keys(existingData).filter(k => k !== 'general_info' && k !== 'topic_files');
+              const reconstructedFields = customKeys.map(k => ({
+                key: k,
+                label: k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                placeholder: '...',
+                type: 'textarea' as 'textarea' | 'text' | 'url'
+              }));
+              setAiGeneratedFields(reconstructedFields);
+            }
+          });
+        }
+        setIsLoading(false);
+      });
+    }
+  }, [editId]);
+
+  // Search nearby places via Overpass API
+  const handleSearchPlaces = async (fieldKey: string, category: string) => {
+    if (!generalInfo?.address && !generalInfo?.city) {
+      toast.error('Alamat bisnis belum diisi di Settings / Informasi Umum');
+      return;
+    }
+
+    setIsSearchingPlaces(true);
+    setShowMap(fieldKey);
+
+    try {
+      const businessName = generalInfo.business_name || '';
+      const address = generalInfo.address || '';
+      const city = generalInfo.city || '';
+      const lat = generalInfo.extra_data?.lat;
+      const lon = generalInfo.extra_data?.lon;
+
+      const res = await fetch('/api/places', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_name: businessName, address, city, category, radius: 1500, lat, lon }),
+      });
+      const data = await res.json();
+
+      if (data.places && data.places.length > 0) {
+        setMapPlaces(data.places);
+        setMapCoords(data.coords);
+
+        // Auto-populate field with scraped data
+        const placesText = data.places.map((p: PlaceResult, i: number) => {
+          let line = `${i + 1}. ${p.name}`;
+          if (p.distance_km) line += ` — ${p.distance_km < 1 ? `${Math.round(p.distance_km * 1000)}m` : `${p.distance_km}km`}`;
+          if (p.cuisine) line += `, ${p.cuisine}`;
+          if (p.opening_hours) line += `, Buka: ${p.opening_hours}`;
+          if (p.phone) line += `, Tel: ${p.phone}`;
+          line += `\n   📍 ${p.maps_url}`;
+          return line;
+        }).join('\n');
+
+        setKnowledgeData(prev => ({ ...prev, [fieldKey]: placesText }));
+        toast.success(`✅ Ditemukan ${data.places.length} tempat di sekitar!`);
+      } else {
+        toast.error('Tidak ditemukan tempat di sekitar alamat tersebut');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Gagal mencari tempat');
+    } finally {
+      setIsSearchingPlaces(false);
+    }
+  };
+
+  // AI generate knowledge fields from custom topic (via Groq server endpoint)
+  const handleGenerateTopicFields = async () => {
+    if (!customTopicInput.trim()) { toast.error('Ketik deskripsi topik terlebih dahulu'); return; }
+    setIsGeneratingFields(true);
+    try {
+      const prompt = `You are helping set up an AI chatbot agent for a ${industry} business.
+The admin wants to create an agent about: "${customTopicInput}"
+Business: ${generalInfo?.business_name || 'N/A'}, ${generalInfo?.city || 'N/A'}
+
+Generate 2-5 relevant knowledge data fields that the admin should fill in for this topic.
+Each field should have:
+- key: snake_case unique identifier
+- label: Human readable label in Indonesian
+- placeholder: Example content in Indonesian showing what to fill (multiline for textarea)
+- type: "text" for short data, "textarea" for long data
+- topicLabel: a clean label for this overall topic in Indonesian
+
+Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "string", "placeholder": "string", "type": "string"}]}`;
+
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Generation failed');
+
+      const result = JSON.parse(data.text || '{}');
+      if (result.fields && result.fields.length > 0) {
+        setAiGeneratedFields(result.fields.map((f: any) => ({ ...f, type: f.type === 'textarea' ? 'textarea' : 'text' })));
+        setCustomTopicLabel(result.topicLabel || customTopicInput);
+        setAgentConfig(prev => ({ ...prev, topic: '__ai_custom__' }));
+        setKnowledgeData({});
+        toast.success(`✨ ${result.fields.length} field knowledge berhasil di-generate!`);
+        setStep(2);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Gagal generate fields');
+    } finally {
+      setIsGeneratingFields(false);
+    }
+  };
+
+  // AI generate instructions + knowledge suggestions (via Groq server endpoint)
+  const handleAIGenerate = async () => {
+    if (!selectedTopic) return;
+
+    setIsGenerating(true);
+
+    try {
+      let prompt = `You are helping set up an AI chatbot agent for a ${industry} business.\n`;
+      prompt += `Business Name: ${generalInfo?.business_name || 'N/A'}\n`;
+      prompt += `Address: ${generalInfo?.address || 'N/A'}, ${generalInfo?.city || 'N/A'}\n`;
+      prompt += `Topic: ${selectedTopic.label}\n`;
+      prompt += `Description: ${selectedTopic.description}\n\n`;
+      prompt += `Based on the topic and business info, generate:\n`;
+      prompt += `1. A perfect "name" for this agent (e.g., "Rina" for food guide, "Budi" for concierge)\n`;
+      prompt += `2. A fitting "role" description\n`;
+      prompt += `3. An appropriate "tone" (e.g., Ramah dan Informatif)\n`;
+      prompt += `4. A clear "goal" for the agent\n`;
+      prompt += `5. Detailed "instructions" (system prompt) telling the AI exactly how to behave, what to answer, and what NOT to do. Write in Indonesian.\n`;
+
+      const filledFields = Object.entries(knowledgeData).filter(([, v]) => v.trim());
+      if (filledFields.length > 0) {
+        prompt += `\nThe admin has filled in the following knowledge data:\n`;
+        for (const [key, value] of filledFields) {
+          prompt += `${key}: ${value}\n`;
+        }
+        prompt += `\nIncorporate this knowledge into the instructions.\n`;
+      }
+
+      prompt += `\nReturn JSON: {"name": "string", "role": "string", "tone": "string", "goal": "string", "instructions": "string"}`;
+
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Generation failed');
+
+      const result = JSON.parse(data.text || '{}');
+      if (result.name) {
+        setAgentConfig(prev => ({ ...prev, ...result }));
+        toast.success('✨ Profil agen berhasil di-generate oleh AI!');
+      }
+    } catch (err: any) {
+      console.error(err);
+      if (err.message?.includes('quota') || err.message?.includes('429')) {
+        toast.error('Limit AI Gratis Terlampaui! Silakan tunggu beberapa detik sebelum mencoba lagi.', { duration: 5000 });
+      } else {
+        toast.error('Gagal generate profil: ' + (err.message || 'Terjadi kesalahan sistem'));
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!agentConfig.name) { toast.error('Nama agent harus diisi'); return; }
+    setIsSaving(true);
+
+    try {
+      let agentId = editId;
+
+      if (editId) {
+        await fetch('/api/agents', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...agentConfig, id: editId }),
+        });
+      } else {
+        const res = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(agentConfig),
+        });
+        const data = await res.json();
+        agentId = data.agent?.id;
+      }
+
+      // Save knowledge data as text sources
+      if (agentId) {
+        // Delete old text sources for this agent (to refresh)
+        const existing = await fetch(`/api/knowledge?agentId=${agentId}`).then(r => r.json());
+        for (const source of (existing.sources || []).filter((s: any) => s.type === 'text')) {
+          await fetch(`/api/knowledge?id=${source.id}`, { method: 'DELETE' });
+        }
+
+        // Save each field as a knowledge source
+        for (const [key, value] of Object.entries(knowledgeData)) {
+          if (value.trim()) {
+            await fetch('/api/knowledge', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ agentId, type: 'text', name: key, content: value }),
+            });
+          }
+        }
+
+        // Save uploaded topic files
+        for (const file of topicFiles) {
+          await fetch('/api/knowledge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agentId, type: 'file', name: file.name, content: file.content, mimeType: file.mimeType }),
+          });
+        }
+      }
+
+      toast.success('Agent berhasil disimpan! 🎉');
+      onBack();
+    } catch (e) {
+      toast.error('Gagal menyimpan');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 font-display">
+              {editId ? 'Edit Agent' : 'Buat Agent Baru'}
+            </h1>
+            <p className="text-gray-500 mt-1">
+              {step === 1 && 'Pilih topik untuk agent Anda'}
+              {step === 2 && 'Isi data knowledge sesuai panduan'}
+              {step === 3 && 'Konfigurasi profil dan instruksi agent'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Step Indicator */}
+      {!editId && (
+        <div className="flex items-center gap-2">
+          {[
+            { n: 1, label: 'Pilih Topik' },
+            { n: 2, label: 'Isi Knowledge' },
+            { n: 3, label: 'Konfigurasi Agent' },
+          ].map((s, i) => (
+            <div key={s.n} className="flex items-center gap-2">
+              <button
+                onClick={() => { if (s.n < step || (s.n === 2 && agentConfig.topic)) setStep(s.n as 1 | 2 | 3); }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${step === s.n ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                  : step > s.n ? 'bg-blue-50 text-blue-600'
+                    : 'bg-gray-100 text-gray-400'
+                  }`}
+              >
+                {step > s.n ? <CheckCircle className="w-4 h-4" /> : <span className="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-xs">{s.n}</span>}
+                {s.label}
+              </button>
+              {i < 2 && <ChevronDown className="w-4 h-4 text-gray-300 -rotate-90" />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* STEP 1: Choose Topic */}
+      {/* ============================================================ */}
+      {step === 1 && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          <Card className="rounded-2xl border-blue-100 bg-blue-50/50">
+            <CardContent className="p-5">
+              <div className="flex items-start gap-3">
+                <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-blue-900 text-sm">Apa itu Topik Agent?</p>
+                  <p className="text-sm text-blue-700 mt-1">Setiap agent membahas satu topik spesifik. Contoh: untuk Hotel, Anda bisa buat agent khusus "Rekomendasi Makanan Sekitar" dan agent terpisah "Room Service". Tiap topik punya data knowledge berbeda.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {templates.topics.map((topic) => (
+              <button
+                key={topic.value}
+                onClick={() => {
+                  setAiGeneratedFields([]);
+                  setAgentConfig(prev => ({ ...prev, topic: topic.value, name: '', instructions: '', goal: '' }));
+                  setKnowledgeData({});
+                  setStep(2);
+                }}
+                className={`rounded-2xl border-2 p-6 text-left transition-all hover:shadow-lg hover:border-blue-300 hover:scale-[1.02] ${agentConfig.topic === topic.value ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white'
+                  }`}
+              >
+                <h3 className="font-semibold text-gray-900 mb-1">{topic.label}</h3>
+                <p className="text-sm text-gray-500">{topic.description}</p>
+                <div className="mt-3 flex items-center gap-1 text-xs text-blue-600 font-medium">
+                  <BookOpen className="w-3 h-3" />
+                  {topic.fields.length} data yang perlu diisi
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Custom AI Topic */}
+          <Card className="rounded-2xl border-purple-100 bg-gradient-to-r from-purple-50 to-indigo-50">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-start gap-3">
+                <Wand2 className="w-5 h-5 text-purple-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-purple-900 text-sm">Atau ketik topik kustom</p>
+                  <p className="text-sm text-purple-700 mt-0.5">Deskripsikan topik Anda dan AI akan generate field knowledge yang relevan secara otomatis.</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="flex-1 rounded-xl border border-purple-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400/50 bg-white"
+                  placeholder="Contoh: rekomendasi makanan halal murah, tips investasi properti..."
+                  value={customTopicInput}
+                  onChange={(e) => setCustomTopicInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleGenerateTopicFields(); }}
+                />
+                <Button
+                  onClick={handleGenerateTopicFields}
+                  disabled={isGeneratingFields || !customTopicInput.trim()}
+                  className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 rounded-xl shrink-0"
+                >
+                  {isGeneratingFields ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                  {isGeneratingFields ? 'Generating...' : 'Generate Fields'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* ============================================================ */}
+      {/* STEP 2: Fill Knowledge Data (Guided) + Upload + Maps */}
+      {/* ============================================================ */}
+      {step === 2 && selectedTopicFields.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          {/* General Knowledge Banner */}
+          <Card className="rounded-2xl border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50">
+            <CardContent className="p-5">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-emerald-900 text-sm">Knowledge Umum Otomatis Terbaca</p>
+                  <p className="text-sm text-emerald-700 mt-1">
+                    Agent ini akan otomatis membaca <strong>{generalKnowledgeCount} data knowledge umum</strong> dari Knowledge Base Umum + informasi bisnis dari Settings.
+                    {generalInfo?.business_name && (
+                      <span className="flex items-center gap-1 mt-1 text-emerald-600">
+                        <MapPin className="w-3 h-3" /> {generalInfo.business_name} — {generalInfo.address}, {generalInfo.city}
+                      </span>
+                    )}
+                  </p>
+                  <Link href="/knowledge" className="text-xs text-emerald-600 hover:text-emerald-700 font-medium mt-2 inline-flex items-center gap-1">
+                    <BookOpen className="w-3 h-3" /> Kelola Knowledge Umum →
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Topic hint */}
+          <Card className="rounded-2xl border-amber-100 bg-amber-50/50">
+            <CardContent className="p-5">
+              <div className="flex items-start gap-3">
+                <Lightbulb className="w-5 h-5 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-900 text-sm">Knowledge Topik: {selectedTopic?.label || customTopicLabel}</p>
+                  <p className="text-sm text-amber-700 mt-1">Isi data spesifik untuk topik ini. Data ini DITAMBAHKAN di atas knowledge umum. Semakin detail, semakin akurat jawaban AI.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Field-based knowledge input */}
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-blue-600" />
+                Data Knowledge: {selectedTopic?.label || customTopicLabel}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {selectedTopicFields.map((field) => (
+                <div key={field.key} className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    {field.label}
+                    {knowledgeData[field.key]?.trim() && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                  </label>
+
+                  {/* Google Maps scraping button for map-enabled fields */}
+                  {field.mapCategory && (
+                    <div className="flex gap-2 mb-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSearchPlaces(field.key, field.mapCategory!)}
+                        disabled={isSearchingPlaces}
+                        className="rounded-xl text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
+                      >
+                        {isSearchingPlaces && showMap === field.key ? (
+                          <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> Mencari...</>
+                        ) : (
+                          <><Search className="w-3 h-3 mr-1.5" /> 🗺️ Cari dari Google Maps</>
+                        )}
+                      </Button>
+                      {mapPlaces.length > 0 && showMap === field.key && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowMap(showMap === field.key ? null : field.key)}
+                          className="rounded-xl text-xs"
+                        >
+                          <Map className="w-3 h-3 mr-1.5" /> {showMap === field.key ? 'Sembunyikan Peta' : 'Tampilkan Peta'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {field.type === 'textarea' ? (
+                    <textarea
+                      className="w-full h-40 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all"
+                      placeholder={field.placeholder}
+                      value={knowledgeData[field.key] || ''}
+                      onChange={(e) => setKnowledgeData(prev => ({ ...prev, [field.key]: e.target.value }))}
+                    />
+                  ) : field.type === 'url' ? (
+                    <input
+                      type="url"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all"
+                      placeholder={field.placeholder}
+                      value={knowledgeData[field.key] || ''}
+                      onChange={(e) => setKnowledgeData(prev => ({ ...prev, [field.key]: e.target.value }))}
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all"
+                      placeholder={field.placeholder}
+                      value={knowledgeData[field.key] || ''}
+                      onChange={(e) => setKnowledgeData(prev => ({ ...prev, [field.key]: e.target.value }))}
+                    />
+                  )}
+
+                  {/* Interactive Map Display */}
+                  {field.mapCategory && showMap === field.key && mapCoords && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-3">
+                      {/* OpenStreetMap Embed */}
+                      <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                        <iframe
+                          src={`https://www.openstreetmap.org/export/embed.html?bbox=${mapCoords.lon - 0.015},${mapCoords.lat - 0.01},${mapCoords.lon + 0.015},${mapCoords.lat + 0.01}&layer=mapnik&marker=${mapCoords.lat},${mapCoords.lon}`}
+                          width="100%"
+                          height="300"
+                          style={{ border: 0 }}
+                          allowFullScreen
+                          loading="lazy"
+                        />
+                      </div>
+
+                      {/* Places List */}
+                      {mapPlaces.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            {mapPlaces.length} tempat ditemukan di sekitar
+                          </p>
+                          <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
+                            {mapPlaces.map((place, i) => (
+                              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 hover:bg-blue-50 transition-colors group">
+                                <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                                  {i + 1}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 truncate">{place.name}</p>
+                                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-0.5">
+                                    <span>{place.distance_km < 1 ? `${Math.round(place.distance_km * 1000)}m` : `${place.distance_km}km`}</span>
+                                    {place.cuisine && <span>• {place.cuisine}</span>}
+                                    {place.opening_hours && <span>• {place.opening_hours}</span>}
+                                  </div>
+                                </div>
+                                <a href={place.maps_url} target="_blank" rel="noopener noreferrer"
+                                  className="text-gray-300 hover:text-blue-600 transition-colors shrink-0">
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* File Upload for Topic Knowledge */}
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Upload className="w-5 h-5 text-indigo-600" />
+                Upload File Tambahan (Opsional)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-500">Upload file tambahan yang spesifik untuk topik ini (brosur, daftar harga PDF, dll.)</p>
+              <div {...getTopicDropProps()} className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${isTopicDragActive ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input {...getTopicInputProps()} />
+                <Upload className="mx-auto h-6 w-6 text-indigo-400 mb-2" />
+                <p className="text-sm font-medium text-gray-700">Klik untuk upload atau drag and drop</p>
+                <p className="text-xs text-gray-500 mt-1">PDF, DOCX, TXT, CSV</p>
+              </div>
+
+              {topicFiles.length > 0 && (
+                <div className="space-y-2">
+                  {topicFiles.map((file, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-indigo-500" />
+                        <span className="text-sm font-medium text-gray-700">{file.name}</span>
+                      </div>
+                      <button onClick={() => setTopicFiles(prev => prev.filter((_, idx) => idx !== i))}
+                        className="text-gray-400 hover:text-red-500">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex gap-3 justify-end">
+            {editId ? (
+              <Button variant="outline" onClick={() => toast.error('Topik tidak dapat diubah setelah agent dibuat.')} className="rounded-xl opacity-50 cursor-not-allowed">← Ganti Topik</Button>
+            ) : (
+              <Button variant="outline" onClick={() => setStep(1)} className="rounded-xl">← Ganti Topik</Button>
+            )}
+            <Button onClick={() => setStep(3)}
+              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-xl">
+              Lanjut ke Konfigurasi →
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ============================================================ */}
+      {/* STEP 3: Agent Configuration */}
+      {/* ============================================================ */}
+      {step === 3 && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          {/* AI Generate Button */}
+          <Card className="rounded-2xl border-purple-100 bg-gradient-to-r from-purple-50 to-indigo-50">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-start gap-3">
+                  <Wand2 className="w-5 h-5 text-purple-600 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-purple-900 text-sm">AI Auto-Generate</p>
+                    <p className="text-sm text-purple-700 mt-0.5">AI akan membuat nama, instruksi, dan profil agent berdasarkan topik & data yang sudah Anda isi.</p>
+                  </div>
+                </div>
+                <Button onClick={handleAIGenerate} disabled={isGenerating}
+                  className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 rounded-xl shrink-0">
+                  {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                  {isGenerating ? 'Generating...' : 'Generate Profil'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              {/* Core Identity */}
+              <Card className="rounded-2xl">
+                <CardHeader><CardTitle>Identitas Agent</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Nama Agent</label>
+                      <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                        value={agentConfig.name} onChange={(e) => setAgentConfig(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Contoh: Rina, Budi, Vero" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Role / Jabatan</label>
+                      <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                        value={agentConfig.role} onChange={(e) => setAgentConfig(prev => ({ ...prev, role: e.target.value }))}
+                        placeholder="Contoh: Food Guide, Concierge" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Tone / Gaya Bicara</label>
+                      <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                        value={agentConfig.tone} onChange={(e) => setAgentConfig(prev => ({ ...prev, tone: e.target.value }))}
+                        placeholder="Contoh: Ramah dan Informatif" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Bahasa Respons</label>
+                      <select
+                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 bg-white"
+                        value={agentConfig.language}
+                        onChange={(e) => setAgentConfig(prev => ({ ...prev, language: e.target.value }))}
+                      >
+                        {LANGUAGES.map(lang => (
+                          <option key={lang.code} value={lang.code}>{lang.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">🎤 Tipe Suara (Voice Call)</label>
+                      <div className="flex gap-3">
+                        {[
+                          { value: 'female', label: '👩 Wanita', desc: 'Suara perempuan' },
+                          { value: 'male', label: '👨 Laki-laki', desc: 'Suara laki-laki' },
+                        ].map((v) => (
+                          <button key={v.value} type="button"
+                            onClick={() => setAgentConfig(prev => ({ ...prev, voice_type: v.value }))}
+                            className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${agentConfig.voice_type === v.value
+                                ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200'
+                                : 'border-gray-200 hover:border-gray-300'
+                              }`}>
+                            <span className="text-sm font-medium">{v.label}</span>
+                            <p className="text-[10px] text-gray-500 mt-0.5">{v.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Tujuan Agent</label>
+                      <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                        value={agentConfig.goal} onChange={(e) => setAgentConfig(prev => ({ ...prev, goal: e.target.value }))}
+                        placeholder="Contoh: Membantu tamu menemukan makanan terbaik di sekitar hotel" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* System Instructions */}
+              <Card className="rounded-2xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    System Instructions
+                    <span className="text-xs font-normal text-gray-500">Klik "Generate Profil" untuk auto-fill</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <textarea className="w-full h-56 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 font-mono"
+                    value={agentConfig.instructions} onChange={(e) => setAgentConfig(prev => ({ ...prev, instructions: e.target.value }))}
+                    placeholder="AI akan generate instruksi otomatis berdasarkan topik dan data yang Anda isi. Anda juga bisa menulis atau mengedit sendiri." />
+                  <p className="text-xs text-gray-500 mt-2">Instruksi ini menentukan bagaimana AI berperilaku saat merespons pengguna.</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Preview */}
+            <div className="lg:col-span-1 space-y-4">
+              <Card className="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-0">
+                <CardHeader><CardTitle className="text-white">Preview Persona</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-2xl font-bold">
+                      {(agentConfig.name || '?').charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-lg">{agentConfig.name || 'Unnamed Agent'}</p>
+                      <p className="text-sm text-blue-100">{agentConfig.role}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2.5 pt-3 border-t border-white/20 text-sm">
+                    {[
+                      ['Topik', selectedTopic?.label || agentConfig.topic || '-'],
+                      ['Industry', agentConfig.industry],
+                      ['Tone', agentConfig.tone],
+                      ['Bahasa', LANGUAGES.find(l => l.code === agentConfig.language)?.label || agentConfig.language],
+                      ['Tujuan', agentConfig.goal || '-'],
+                    ].map(([label, value]) => (
+                      <div key={label as string}>
+                        <span className="text-[10px] text-blue-200 uppercase tracking-wider">{label}</span>
+                        <p className="font-medium">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Knowledge summary */}
+              <Card className="rounded-2xl">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-blue-600" /> Data Knowledge
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* General knowledge count */}
+                  <div className="flex items-center gap-2 text-sm p-2 rounded-lg bg-emerald-50 border border-emerald-100">
+                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="text-emerald-700">{generalKnowledgeCount} sumber knowledge umum</span>
+                  </div>
+
+                  {/* Topic knowledge fields */}
+                  {selectedTopicFields.length > 0 ? selectedTopicFields.map(f => (
+                    <div key={f.key} className="flex items-center gap-2 text-sm">
+                      {knowledgeData[f.key]?.trim() ? (
+                        <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                      ) : (
+                        <div className="w-4 h-4 rounded-full border-2 border-gray-300 shrink-0" />
+                      )}
+                      <span className={knowledgeData[f.key]?.trim() ? 'text-gray-900' : 'text-gray-400'}>{f.label}</span>
+                    </div>
+                  )) : (
+                    <p className="text-sm text-gray-500">Pilih topik terlebih dahulu</p>
+                  )}
+
+                  {/* Files count */}
+                  {topicFiles.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm p-2 rounded-lg bg-indigo-50 border border-indigo-100">
+                      <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
+                      <span className="text-indigo-700">{topicFiles.length} file tambahan</span>
+                    </div>
+                  )}
+
+                  {step === 3 && (
+                    <button onClick={() => setStep(2)} className="text-xs text-blue-600 hover:text-blue-700 font-medium mt-2 flex items-center gap-1">
+                      ← Edit Data Knowledge
+                    </button>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Save */}
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" onClick={() => setStep(2)} className="rounded-xl">← Kembali</Button>
+            <Button onClick={handleSave} disabled={isSaving}
+              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-xl px-8">
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Simpan Agent
+            </Button>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}

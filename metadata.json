@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Vero AI",
+  "description": "AI Agent Omnichannel Platform for Customer Service, Sales, and Concierge services.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}

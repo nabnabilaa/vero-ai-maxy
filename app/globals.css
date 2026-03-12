@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  --color-maxy-blue: #0056D2;
+  --color-maxy-blue-hover: #0044A5;
+  --color-light-grey: #F8F9FA;
+  --color-text-primary: #1A1A1A;
+  --color-text-secondary: #666666;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--color-light-grey);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
