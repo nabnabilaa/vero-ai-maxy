@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 // Reuse pool across Next.js hot reloads to prevent "Too many connections"
 const globalForDb = globalThis as unknown as { mysqlPool: mysql.Pool };
 
-const pool = globalForDb.mysqlPool || mysql.createPool({
+const poolConfig: mysql.PoolOptions = {
   host: process.env.DB_HOST || 'localhost',
   port: Number(process.env.DB_PORT) || 3306,
   user: process.env.DB_USER || 'root',
@@ -13,8 +13,15 @@ const pool = globalForDb.mysqlPool || mysql.createPool({
   waitForConnections: true,
   connectionLimit: 5,
   queueLimit: 0,
-  idleTimeout: 30000, // Close idle connections after 30 seconds
-});
+  idleTimeout: 30000,
+};
+
+// Enable SSL if specified in environment variable
+if (process.env.DB_SSL === 'true') {
+  poolConfig.ssl = { rejectUnauthorized: false }; // Aiven uses SSL, we set false to avoid CA cert issues if not provided
+}
+
+const pool = globalForDb.mysqlPool || mysql.createPool(poolConfig);
 
 if (process.env.NODE_ENV !== 'production') {
   globalForDb.mysqlPool = pool;
