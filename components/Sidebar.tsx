@@ -4,14 +4,16 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, BookOpen, Bot, BarChart3, Settings, LogOut, AlertTriangle, QrCode } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { useTranslation } from '@/hooks/useTranslation';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'My Agents', href: '/agents', icon: Bot },
-  { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { name: 'Complaints', href: '/complaints', icon: AlertTriangle },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { id: 'dashboard', href: '/', icon: LayoutDashboard },
+  { id: 'agents', href: '/agents', icon: Bot },
+  { id: 'knowledgeBase', href: '/knowledge', icon: BookOpen },
+  { id: 'analytics', href: '/analytics', icon: BarChart3 },
+  { id: 'complaints', href: '/complaints', icon: AlertTriangle },
+  { id: 'settings', href: '/settings', icon: Settings },
 ];
 
 const industryColors: Record<string, string> = {
@@ -34,6 +36,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { admin, logout } = useStore();
+  const { t } = useTranslation();
   const industry = admin?.industry || 'General';
   const gradient = industryColors[industry] || industryColors.General;
 
@@ -65,7 +68,7 @@ export function Sidebar() {
             const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
             return (
               <Link
-                key={item.name}
+                key={item.id}
                 href={item.href}
                 className={`group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${isActive
                   ? 'bg-blue-50 text-blue-700 shadow-sm'
@@ -76,7 +79,7 @@ export function Sidebar() {
                   className={`mr-3 h-5 w-5 flex-shrink-0 transition-colors ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'
                     }`}
                 />
-                {item.name}
+                {t(`sidebar.${item.id}` as any)}
               </Link>
             );
           })}
@@ -85,6 +88,9 @@ export function Sidebar() {
 
       {/* Admin Info + Logout */}
       <div className="border-t border-gray-200 p-4 space-y-3">
+        <div className="px-3 pb-2 border-b border-gray-100 mb-2">
+          <LanguageSwitcher />
+        </div>
         {admin && (
           <div className="px-3 py-2">
             <p className="text-sm font-semibold text-gray-900 truncate">{admin.name}</p>
@@ -96,7 +102,7 @@ export function Sidebar() {
           className="group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all"
         >
           <LogOut className="mr-3 h-5 w-5 flex-shrink-0 text-gray-400 group-hover:text-red-500" />
-          Sign Out
+          {t('sidebar.logout')}
         </button>
       </div>
     </div>

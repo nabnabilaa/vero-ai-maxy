@@ -44,6 +44,10 @@ interface AppState {
   setAdmin: (admin: AdminSession | null) => void;
   logout: () => void;
 
+  // Settings
+  language: 'id' | 'en';
+  setLanguage: (lang: 'id' | 'en') => void;
+
   // Agents
   agents: AgentConfig[];
   setAgents: (agents: AgentConfig[]) => void;
@@ -62,6 +66,9 @@ export const useStore = create<AppState>()(
       isAuthenticated: false,
       setAdmin: (admin) => set({ admin, isAuthenticated: !!admin }),
       logout: () => set({ admin: null, isAuthenticated: false, agents: [], activeAgentId: null }),
+
+      language: 'id',
+      setLanguage: (lang) => set({ language: lang }),
 
       agents: [],
       setAgents: (agents) => set({ agents }),
@@ -101,6 +108,7 @@ export const useStore = create<AppState>()(
         isAuthenticated: state.isAuthenticated,
         agents: state.agents,
         activeAgentId: state.activeAgentId,
+        language: state.language,
         // Don't persist pendingScrapes — it's transient
       }),
     }
