@@ -6,7 +6,20 @@
     "delete": "Hapus",
     "edit": "Edit",
     "success": "Berhasil",
-    "error": "Terjadi kesalahan"
+    "error": "Terjadi kesalahan",
+    "back": "Kembali",
+    "confirmDelete": "Apakah Anda yakin ingin menghapus ini?",
+    "noData": "Tidak ada data tersedia",
+    "search": "Cari",
+    "all": "Semua",
+    "actions": "Aksi",
+    "status": "Status",
+    "priority": "Prioritas",
+    "name": "Nama",
+    "type": "Tipe",
+    "date": "Tanggal",
+    "details": "Detail",
+    "summary": "Ringkasan"
   },
   "dashboard": {
     "welcome": "Selamat Datang kembali, {name} 👋",
@@ -44,7 +57,14 @@
     "complaint": "Keluhan",
     "noAgents": "Belum ada agent",
     "createFirstAgent": "Buat agent AI pertamamu untuk mulai menangani percakapan",
-    "btnCreateAgent": "Buat Agent Baru"
+    "btnCreateAgent": "Buat Agent Baru",
+    "industryGreeting": {
+      "Hotel": "Kelola agent concierge AI hotel Anda",
+      "Retail": "Kelola asisten belanja AI retail Anda",
+      "Restaurant": "Kelola agent layanan AI restoran Anda",
+      "Real Estate": "Kelola agent konsultasi AI properti Anda",
+      "General": "Kelola agent AI serbaguna Anda"
+    }
   },
   "sidebar": {
     "dashboard": "Dashboard",
@@ -54,5 +74,372 @@
     "complaints": "Riwayat Keluhan",
     "settings": "Pengaturan",
     "logout": "Keluar"
+  },
+  "agents": {
+    "title": "My Agents",
+    "subtitle": "Buat dan kelola agent chatbot AI Anda",
+    "newAgent": "Agent Baru",
+    "noAgentsTitle": "Belum ada agent",
+    "noAgentsSubtitle": "Buat agent AI pertamamu untuk memulai",
+    "createAgentBtn": "Buat Agent",
+    "industry": "Industri",
+    "tokensUsed": "Token Digunakan",
+    "knowledgeSources": "Sumber Knowledge",
+    "conversations": "Percakapan",
+    "showQR": "Tampilkan Kode QR",
+    "hideQR": "Sembunyikan Kode QR",
+    "copyLink": "Salin Link",
+    "openBot": "Buka Bot",
+    "deleteConfirm": "Apakah Anda yakin ingin menghapus agent ini?",
+    "deletedSuccess": "Agent dihapus",
+    "deleteError": "Gagal menghapus agent",
+    "toggleError": "Gagal memperbarui agent",
+    "linkCopied": "Link bot berhasil disalin!",
+    "form": {
+      "editTitle": "Edit Agent",
+      "createTitle": "Buat Agent Baru",
+      "step1": "Pilih Topik",
+      "step2": "Isi Knowledge",
+      "step3": "Konfigurasi Agent",
+      "topicHintTitle": "Apa itu Topik Agent?",
+      "topicHintDesc": "Setiap agent membahas satu topik spesifik. Contoh: untuk Hotel, Anda bisa buat agent khusus 'Rekomendasi Makanan Sekitar' dan agent terpisah 'Room Service'. Tiap topik punya data knowledge berbeda.",
+      "customTopicTitle": "Atau ketik topik kustom",
+      "customTopicDesc": "Deskripsikan topik Anda dan AI akan generate field knowledge yang relevan secara otomatis.",
+      "customTopicPlaceholder": "Contoh: rekomendasi makanan halal murah, tips investasi properti...",
+      "generateFieldsBtn": "Generate Fields",
+      "generating": "Generating...",
+      "generateSuccess": "{count} field knowledge berhasil di-generate!",
+      "generateError": "Gagal generate fields",
+      "generalKnowledgeTitle": "Knowledge Umum Otomatis Terbaca",
+      "generalKnowledgeDesc": "Agent ini akan otomatis membaca {count} data knowledge umum dari Knowledge Base Umum + informasi bisnis dari Settings.",
+      "manageGeneralKnowledge": "Kelola Knowledge Umum →",
+      "topicKnowledgeTitle": "Knowledge Topik: {topic}",
+      "topicKnowledgeDesc": "Isi data spesifik untuk topik ini. Data ini DITAMBAHKAN di atas knowledge umum. Semakin detail, semakin akurat jawaban AI.",
+      "searchMaps": "Cari dari Google Maps",
+      "searching": "Mencari...",
+      "mapSearchSuccess": "✅ Ditemukan {count} tempat di sekitar!",
+      "mapSearchError": "Tidak ditemukan tempat di sekitar alamat tersebut",
+      "hideMap": "Sembunyikan Peta",
+      "showMap": "Tampilkan Peta",
+      "placesNearby": "{count} tempat ditemukan di sekitar",
+      "uploadAdditional": "Upload File Tambahan (Opsional)",
+      "uploadDesc": "Upload file tambahan yang spesifik untuk topik ini (brosur, daftar harga PDF, dll.)",
+      "uploadLimit": "PDF, DOCX, TXT, CSV (max 10MB)",
+      "agentProfile": "Profil Agent",
+      "profileDesc": "Identitas dan instruksi di bawah ini di-generate oleh AI. Anda tetap bisa menyesuaikannya.",
+      "aiGenerateBtn": "AI Generate Profil & Instruksi",
+      "aiGenerateHint": "✨ Rekomendasi: Biarkan AI membuat pengaturan terbaik berdasarkan data knowledge Anda.",
+      "agentName": "Nama Agent",
+      "placeholderName": "Contoh: Rina, Budi, Assistant AI",
+      "role": "Peran / Jabatan",
+      "placeholderRole": "Contoh: Concierge Hotel, Customer Service",
+      "tone": "Nada Percakapan",
+      "placeholderTone": "Contoh: Ramah, Profesional, Formal",
+      "goal": "Tujuan Agent",
+      "placeholderGoal": "Apa tugas utama dari agent ini?",
+      "instructions": "Instruksi Detail (System Prompt)",
+      "placeholderInstructions": "Tulis aturan detail untuk agent di sini...",
+      "language": "Bahasa Utama",
+      "voice": "Tipe Suara",
+      "voiceFemale": "Wanita",
+      "voiceMale": "Pria",
+      "active": "Status Aktif",
+      "activeDesc": "Agent dapat menjawab chat/voice",
+      "inactiveDesc": "Agent dinonaktifkan sementara",
+      "saveBtn": "Simpan Agent",
+      "saving": "Menyimpan...",
+      "saveSuccess": "Agent berhasil disimpan! 🎉",
+      "saveError": "Gagal menyimpan",
+      "aiGenerateSuccess": "✨ Profil agen berhasil di-generate oleh AI!",
+      "aiQuotaError": "Limit AI Gratis Terlampaui! Silakan tunggu beberapa detik sebelum mencoba lagi.",
+      "aiError": "Gagal generate profil: {message}",
+      "addressNotSet": "Alamat bisnis belum diisi di Settings",
+      "itemAdded": "{name} ditambahkan"
+    },
+    "templates": {
+      "Hotel": {
+        "nearby_food": {
+          "label": "Rekomendasi Makanan Sekitar",
+          "description": "AI akan merekomendasikan tempat makan di sekitar hotel",
+          "fields": {
+            "restaurant_list": { "label": "Daftar Restoran/Warung Terdekat", "placeholder": "Contoh:\n1. Warung Nasi Padang Sari Bundo — 200m, Halal, Rp15.000-30.000\n2. Restoran Korea Kimchi House — 500m, Non-Halal, Rp50.000-100.000\n3. Kedai Kopi Lokal — 100m, Rp10.000-25.000" },
+            "hotel_restaurant": { "label": "Restaurant di Hotel", "placeholder": "Contoh: Sky Lounge Rooftop — Buka 07:00-22:00, Menu buffet Rp150.000/orang" }
+          }
+        },
+        "nearby_attractions": {
+          "label": "Tempat Wisata Sekitar",
+          "description": "AI akan merekomendasikan objek wisata dan hiburan sekitar",
+          "fields": {
+            "attractions": { "label": "Daftar Tempat Wisata", "placeholder": "Contoh:\n1. Pantai Kuta — 2km, tiket gratis, buka 24 jam\n2. Museum Seni — 500m, tiket Rp25.000, buka 09:00-17:00" },
+            "transport": { "label": "Transportasi yang Tersedia", "placeholder": "Contoh: Grab/Gojek, shuttle hotel gratis ke mall, rental motor Rp75.000/hari" }
+          }
+        },
+        "room_service": {
+          "label": "Room Service & Fasilitas",
+          "description": "AI akan menjawab pertanyaan tentang kamar dan fasilitas hotel",
+          "fields": {
+            "room_types": { "label": "Tipe Kamar & Harga", "placeholder": "Contoh:\n- Standard Room: Rp500.000/malam, 1 King Bed, WiFi, AC\n- Deluxe: Rp800.000/malam, 1 King Bed, Balcony, Minibar\n- Suite: Rp1.500.000/malam, Living Room, Jacuzzi" },
+            "facilities": { "label": "Fasilitas Hotel", "placeholder": "Contoh: Swimming Pool (07:00-21:00), Gym (24 jam), Spa (10:00-20:00), Laundry" },
+            "checkin": { "label": "Waktu Check-in/Check-out", "placeholder": "Check-in: 14:00, Check-out: 12:00, Early check-in tersedia dengan biaya tambahan" }
+          }
+        },
+        "concierge": {
+          "label": "Concierge Umum",
+          "description": "AI menjawab segala pertanyaan tamu tentang hotel",
+          "fields": {
+            "faq": { "label": "FAQ / Pertanyaan Umum", "placeholder": "Contoh:\nQ: Apakah ada WiFi gratis?\nA: Ya, WiFi gratis tersedia di seluruh area hotel. Password: WELCOME2024\n\nQ: Bagaimana cara ke airport?\nA: Hotel menyediakan shuttle airport (Rp100.000/orang), pesan 4 jam sebelumnya" },
+            "policies": { "label": "Kebijakan Hotel", "placeholder": "Contoh: No smoking policy, Pet friendly (Rp200.000 extra), Pembatalan gratis H-1" }
+          }
+        }
+      },
+      "Retail": {
+        "product_catalog": {
+          "label": "Katalog Produk",
+          "description": "AI menjawab pertanyaan tentang produk yang tersedia",
+          "fields": {
+            "products": { "label": "Daftar Produk", "placeholder": "Contoh:\n1. iPhone 15 Pro Max — Rp22.999.000, Unit Apple, Garansi 1 tahun\n2. Samsung S24 Ultra — Rp19.999.000, Garansi resmi" },
+            "categories": { "label": "Kategori Produk", "placeholder": "Contoh: Smartphone, Laptop, Aksesoris, Smartwatch" },
+            "promos": { "label": "Promo & Diskon Aktif", "placeholder": "Contoh: Diskon 20% untuk semua aksesoris, Cicilan 0% 12 bulan via BCA" }
+          }
+        },
+        "store_info": {
+          "label": "Info Toko & Pengiriman",
+          "description": "AI menjawab tentang lokasi toko, jam buka, dan pengiriman",
+          "fields": {
+            "branches": { "label": "Cabang / Lokasi Toko", "placeholder": "Contoh:\n1. Cabang Sudirman — Jl. Sudirman No.12, buka 10:00-22:00\n2. Cabang Mall Grand — Lt.2 Unit 201, buka 10:00-21:30" },
+            "shipping": { "label": "Info Pengiriman", "placeholder": "Contoh: JNE, J&T, SiCepat, Same-day delivery via GoSend" },
+            "return_policy": { "label": "Kebijakan Pengembalian", "placeholder": "Contoh: Pengembalian dalam 7 hari, produk belum dibuka, sertakan nota" }
+          }
+        }
+      },
+      "Restaurant": {
+        "menu": {
+          "label": "Menu & Rekomendasi",
+          "description": "AI membantu pelanggan memilih menu",
+          "fields": {
+            "menu_items": { "label": "Daftar Menu", "placeholder": "Contoh:\nAPPETIZER:\n- Sate Lilit Bali — Rp35.000, Pedas ringan\n- Salad Caesar — Rp28.000, Vegetarian\n\nMAIN COURSE:\n- Nasi Goreng Seafood — Rp55.000\n- Steak Wagyu 200gr — Rp250.000" },
+            "specialties": { "label": "Menu Andalan / Chef Recommendation", "placeholder": "Contoh: Bebek Goreng Bumbu Bali (best seller), Paket Rijsttafel untuk 4 orang" },
+            "dietary": { "label": "Opsi Diet / Alergi", "placeholder": "Tersedia: Vegetarian, Vegan, Gluten-free, Halal certified" }
+          }
+        },
+        "reservation": {
+          "label": "Reservasi & Info",
+          "description": "AI membantu reservasi dan info restoran",
+          "fields": {
+            "booking_info": { "label": "Info Reservasi", "placeholder": "Contoh: Reservasi via WhatsApp 081234567890, minimal 2 jam sebelumnya, deposit Rp100.000 untuk grup >6 orang" },
+            "operating_hours": { "label": "Jam Operasional", "placeholder": "Contoh: Senin-Kamis 11:00-22:00, Jumat-Minggu 11:00-23:00, Happy Hour 15:00-18:00" },
+            "capacity": { "label": "Kapasitas & Area", "placeholder": "Contoh: Indoor 50 pax, Outdoor Garden 30 pax, Private Room 12 pax" }
+          }
+        }
+      },
+      "Real Estate": {
+        "property_listing": {
+          "label": "Listing Properti",
+          "description": "AI membantu calon pembeli/penyewa menemukan properti",
+          "fields": {
+            "properties": { "label": "Daftar Properti", "placeholder": "Contoh:\n1. Rumah Bintaro Sektor 9 — Rp2.5M, 3KT/2KM, LT150/LB120, SHM\n2. Apartemen Sudirman Park — Rp8jt/bulan, Studio 28m², Full Furnished" },
+            "facilities_area": { "label": "Area Fasilitas / Lingkungan", "placeholder": "Contoh: Dekat sekolah internasional, RS Pondok Indah 2km, akses tol langsung" }
+          }
+        },
+        "consultation": {
+          "label": "Konsultasi Properti",
+          "description": "AI membantu konsultasi KPR, investasi, dll",
+          "fields": {
+            "kpr_info": { "label": "Info KPR & Pembayaran", "placeholder": "Contoh: Kerjasama KPR dengan BCA, Mandiri, BTN. DP mulai 10%, tenor 20 tahun" },
+            "faq": { "label": "FAQ Properti", "placeholder": "Q: Dokumen apa saja yang diperlukan?\nA: KTP, NPWP, Slip gaji 3 bulan terakhir, Rekening koran" }
+          }
+        }
+      },
+      "General": {
+        "customer_service": {
+          "label": "Customer Service",
+          "description": "AI menjawab pertanyaan umum pelanggan",
+          "fields": {
+            "faq": { "label": "FAQ / Pertanyaan Umum", "placeholder": "Masukkan pertanyaan dan jawaban yang sering ditanyakan..." },
+            "contact_info": { "label": "Info Kontak", "placeholder": "Contoh: WhatsApp 081234567890, Email support@company.com" }
+          }
+        },
+        "custom": {
+          "label": "Topik Kustom",
+          "description": "Buat agent kustom sesuai kebutuhan",
+          "fields": {
+            "custom_knowledge": { "label": "Knowledge Data", "placeholder": "Masukkan informasi yang relevan dengan kebutuhan agen..." }
+          }
+        }
+      }
+    }
+  },
+  "knowledge": {
+    "title": "Knowledge Base Umum",
+    "subtitle": "Data pengetahuan perusahaan yang digunakan oleh semua agent Anda.",
+    "bannerTitle": "Apa itu Knowledge Base Umum?",
+    "bannerDesc": "Data ini akan menjadi fondasi pengetahuan dasar untuk semua AI agent Anda. Masukkan informasi lengkap tentang perusahaan: deskripsi bisnis, layanan, SOP, FAQ, kebijakan, dll. Setiap agent akan otomatis membaca data ini + knowledge spesifik topiknya.",
+    "uploadFile": "Upload File (PDF, DOCX, TXT)",
+    "addUrl": "Tambah URL",
+    "pasteText": "Tempel Tulisan",
+    "addKnowledgeTitle": "Tambah Data Knowledge",
+    "tabs": {
+      "text": "Tempel Tulisan",
+      "files": "Upload File",
+      "urls": "Tambah URL"
+    },
+    "textLabel": "Judul / Label",
+    "textPlaceholder": "Contoh: Deskripsi Perusahaan, FAQ, Kebijakan",
+    "textContentLabel": "Isi Knowledge",
+    "textContentPlaceholder": "Tempel informasi lengkap tentang perusahaan Anda di sini...\n\nContoh:\n- Deskripsi bisnis dan layanan\n- SOP pelayanan\n- FAQ pelanggan\n- Kebijakan & prosedur\n- Informasi produk / fasilitas",
+    "saveTextBtn": "Simpan Teks",
+    "uploadTitle": "Klik untuk upload atau drag and drop",
+    "uploadDesc": "PDF, DOCX, TXT, CSV (max 10MB)",
+    "urlPlaceholder": "https://website-perusahaan.com/tentang-kami",
+    "addBtn": "Tambah",
+    "processing": "Memproses...",
+    "savedSources": "Data Tersimpan",
+    "sourceCount": "{count} sumber",
+    "noSources": "Belum ada data knowledge.",
+    "startHint": "Mulai dengan menambahkan informasi tentang bisnis Anda.",
+    "deleteConfirm": "Apakah Anda yakin ingin menghapus knowledge ini?",
+    "deleteSuccess": "Data knowledge dihapus",
+    "uploadSuccess": "{name} berhasil di-upload",
+    "urlScrapeWarning": "⚠️ Scraping website memakan token yang cukup besar (bisa 10.000+ token per halaman). Pastikan URL yang di-scrape benar-benar diperlukan.",
+    "urlScrapeConfirm": "⚠️ URL ini sudah pernah di-scrape sebelumnya.\n\nScraping ulang akan memakan token tambahan yang cukup besar.\n\nYakin ingin scrape ulang?",
+    "crawlStarted": "🕷️ Crawling dimulai! Anda bisa meninggalkan halaman ini sambil menunggu. Notifikasi muncul saat selesai.",
+    "textSuccess": "Teks berhasil ditambahkan",
+    "viewTitle": "Detail Knowledge",
+    "chars": "{count} karakter",
+    "addedDate": "Ditambahkan: {date}",
+    "emptyContent": "(Konten kosong)",
+      "editSaveSuccess": "✅ Knowledge berhasil diperbarui!"
+  },
+  "analytics": {
+    "title": "Analytics & History",
+    "subtitle": "Monitor percakapan, penggunaan token, dan Live Analysis per topik agent.",
+    "stats": {
+      "totalConversations": "Total Percakapan",
+      "totalTokens": "Total Token",
+      "activeAgents": "Agent Aktif",
+      "today": "Hari Ini"
+    },
+    "recentList": "Daftar Percakapan Terkini",
+    "totalCount": "{count} total",
+    "topicTitle": "Topik: {topic}",
+    "convCount": "{count} percakapan",
+    "liveAnalysis": "AI Live Analysis",
+    "runAnalysis": "Jalankan Analisis",
+    "refresh": "Refresh",
+    "analyzing": "Menganalisis...",
+    "analysisSuccess": "✨ Analisis topik {topic} selesai!",
+    "analysisError": "Gagal menganalisis: {message}",
+    "clickDetail": "Klik untuk detail →",
+    "messagesCount": "{count} pesan",
+    "selectConv": "Pilih percakapan",
+    "analyzingDetail": "Sedang menganalisis percakapan...",
+    "analyzingDesc": "AI sedang membaca semua chat di topik ini",
+    "sentiment": "Sentiment {type}",
+    "ordersRequests": "Pesanan & Permintaan",
+    "customerData": "Data Pelanggan Terpilih",
+    "noAnalysisData": "Tidak ditemukan pesanan atau data pelanggan spesifik di percakapan ini.",
+    "runAnalysisHint": "Klik 'Run Analysis' pada topik di kolom kiri",
+    "tokensUsed": "{count} token",
+    "anonymous": "Tanpa Nama"
+  },
+  "complaints": {
+    "title": "Complaint Handling",
+    "subtitle": "Kelola keluhan pelanggan dari sesi chat dan suara",
+    "stats": {
+      "open": "Baru",
+      "inProgress": "Diproses",
+      "resolved": "Selesai",
+      "total": "Total"
+    },
+    "listTitle": "Semua Keluhan",
+    "noComplaints": "Belum ada keluhan! 🎉",
+    "detailTitle": "Detail Keluhan",
+    "selectHint": "Pilih keluhan",
+    "clickHint": "Klik keluhan untuk melihat detail",
+    "customer": "Pelanggan",
+    "phone": "Telepon",
+    "notProvided": "Tidak tersedia",
+    "callNow": "Hubungi sekarang →",
+    "summary": "Ringkasan",
+    "noSummary": "Tidak ada ringkasan",
+    "details": "Detail",
+    "noDetails": "Tidak ada detail yang diberikan",
+    "agent": "Agent",
+    "type": "Tipe",
+    "created": "Dibuat",
+    "markInProgress": "Tandai Sedang Diproses",
+    "markResolved": "Tandai Selesai",
+    "close": "Tutup",
+    "statusUpdated": "Status diperbarui menjadi {status}"
+  },
+  "settings": {
+    "title": "Pengaturan",
+    "subtitle": "Kelola informasi bisnis dan preferensi akun Anda",
+    "placeholderAddress": "Contoh: Jl. Sudirman No.123, Senayan, Kebayoran Baru",
+    "phone": "Telepon",
+    "placeholderPhone": "Contoh: +62 21 1234 5678",
+    "email": "Email Bisnis",
+    "placeholderEmail": "Contoh: info@grandvero.com",
+    "website": "Website",
+    "placeholderWebsite": "Contoh: https://grandvero.com",
+    "mapsLink": "Link Google Maps",
+    "placeholderMaps": "Contoh: https://maps.app.goo.gl/...",
+    "autoFill": "⚡ Auto-fill dari Maps",
+    "extracting": "Sedang Ekstrak...",
+    "gpsSaved": "✓ Koordinat GPS tersimpan (Akurasi Peta maksimal)",
+    "description": "Deskripsi Bisnis",
+    "placeholderDesc": "Jelaskan bisnis Anda secara singkat... Contoh: Hotel bintang 4 di pusat Jakarta yang menyediakan layanan premium untuk wisatawan bisnis dan keluarga.",
+    "industryDetail": "Detail Industri",
+    "industryDesc": "Informasi spesifik untuk industri {industry} Anda",
+    "adminAccount": "Akun Admin",
+    "apiConfig": "Konfigurasi API",
+    "serverManaged": "Server Managed",
+    "apiKeyDesc": "API key dikelola secara aman di server.",
+    "demoAccounts": "Akun Demo",
+    "demoPassword": "Semua akun demo menggunakan password:",
+    "saveSettings": "Simpan Pengaturan",
+    "saving": "Menyimpan...",
+    "saveSuccess": "Informasi bisnis berhasil disimpan! ✅",
+    "saveError": "Gagal menyimpan: {message}",
+    "extractSuccess": "✨ Berhasil mengisi: {fields}",
+    "extractError": "Gagal mengekstrak Maps: {message}",
+    "industries": {
+      "Hotel": {
+        "star_rating": "Rating Bintang",
+        "star_placeholder": "Contoh: 4 Stars",
+        "total_rooms": "Jumlah Kamar",
+        "rooms_placeholder": "Contoh: 120 kamar",
+        "check_in_time": "Waktu Check-in",
+        "check_in_placeholder": "Contoh: 14:00",
+        "check_out_time": "Waktu Check-out",
+        "check_out_placeholder": "Contoh: 12:00"
+      },
+      "Retail": {
+        "store_type": "Tipe Toko",
+        "store_placeholder": "Contoh: Electronics, Fashion, Grocery",
+        "operating_hours": "Jam Operasional",
+        "hours_placeholder": "Contoh: 10:00-22:00 setiap hari",
+        "payment": "Metode Pembayaran",
+        "payment_placeholder": "Contoh: Cash, Debit, Kredit, QRIS, OVO, GoPay"
+      },
+      "Restaurant": {
+        "cuisine_type": "Tipe Masakan",
+        "cuisine_placeholder": "Contoh: Indonesian, Japanese, Italian",
+        "operating_hours": "Jam Operasional",
+        "hours_placeholder": "Contoh: 11:00-22:00",
+        "halal_status": "Status Halal",
+        "halal_placeholder": "Contoh: Halal Certified, Non-Halal, Mixed",
+        "capacity": "Kapasitas",
+        "capacity_placeholder": "Contoh: 80 kursi indoor, 20 outdoor"
+      },
+      "Real Estate": {
+        "property_types": "Tipe Properti",
+        "property_placeholder": "Rumah, Apartemen, Ruko, Tanah",
+        "coverage_area": "Area Layanan",
+        "coverage_placeholder": "Contoh: Jabodetabek, Bali, Surabaya",
+        "license": "Lisensi/Sertifikasi",
+        "license_placeholder": "Contoh: REI Member, AREBI Licensed"
+      }
+    }
   }
 }

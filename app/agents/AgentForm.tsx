@@ -10,6 +10,7 @@ import { Sparkles, Save, Loader2, ArrowLeft, Lightbulb, Wand2, ChevronDown, MapP
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 type TopicField = { key: string; label: string; placeholder: string; type: 'text' | 'textarea' | 'url'; mapCategory?: string };
 
@@ -189,6 +190,7 @@ type PlaceResult = {
 
 export default function AgentForm({ editId, onBack }: { editId?: string | null; onBack: () => void }) {
   const { admin } = useStore();
+  const { t } = useTranslation();
   const industry = admin?.industry || 'General';
 
   const [agentConfig, setAgentConfig] = useState({
@@ -234,7 +236,7 @@ export default function AgentForm({ editId, onBack }: { editId?: string | null; 
         const base64 = btoa(new Uint8Array(reader.result as ArrayBuffer)
           .reduce((data, byte) => data + String.fromCharCode(byte), ''));
         setTopicFiles(prev => [...prev, { name: file.name, content: base64, mimeType: file.type }]);
-        toast.success(`${file.name} ditambahkan`);
+        toast.success(t('agents.form.itemAdded', { name: file.name }));
       };
       reader.readAsArrayBuffer(file);
     });
@@ -244,8 +246,18 @@ export default function AgentForm({ editId, onBack }: { editId?: string | null; 
 
   const templates = TOPIC_TEMPLATES[industry] || TOPIC_TEMPLATES.General;
   const presetTopic = templates.topics.find(t => t.value === agentConfig.topic);
-  // Merge preset fields with AI-generated fields
-  const selectedTopic = presetTopic ? presetTopic : (agentConfig.topic === '__ai_custom__' && aiGeneratedFields.length > 0 ? { value: '__ai_custom__', label: customTopicLabel, description: 'Topik kustom dari AI', fields: aiGeneratedFields } : null);
+  
+  // Re-map preset topic with translations
+  const selectedTopic = presetTopic ? {
+    ...presetTopic,
+    label: t(`agents.templates.${industry}.${agentConfig.topic}.label` as any),
+    description: t(`agents.templates.${industry}.${agentConfig.topic}.description` as any),
+    fields: presetTopic.fields.map(f => ({
+      ...f,
+      label: t(`agents.templates.${industry}.${agentConfig.topic}.fields.${f.key}.label` as any),
+      placeholder: t(`agents.templates.${industry}.${agentConfig.topic}.fields.${f.key}.placeholder` as any)
+    }))
+  } : (agentConfig.topic === '__ai_custom__' && aiGeneratedFields.length > 0 ? { value: '__ai_custom__', label: customTopicLabel, description: t('agents.form.profileDesc'), fields: aiGeneratedFields } : null);
   const selectedTopicFields: TopicField[] = selectedTopic?.fields || [];
 
   // Load general info + general knowledge count
@@ -297,7 +309,7 @@ export default function AgentForm({ editId, onBack }: { editId?: string | null; 
   // Search nearby places via Overpass API
   const handleSearchPlaces = async (fieldKey: string, category: string) => {
     if (!generalInfo?.address && !generalInfo?.city) {
-      toast.error('Alamat bisnis belum diisi di Settings / Informasi Umum');
+      toast.error(t('agents.form.addressNotSet'));
       return;
     }
 
@@ -334,13 +346,13 @@ export default function AgentForm({ editId, onBack }: { editId?: string | null; 
         }).join('\n');
 
         setKnowledgeData(prev => ({ ...prev, [fieldKey]: placesText }));
-        toast.success(`✅ Ditemukan ${data.places.length} tempat di sekitar!`);
+        toast.success(t('agents.form.mapSearchSuccess', { count: data.places.length }));
       } else {
-        toast.error('Tidak ditemukan tempat di sekitar alamat tersebut');
+        toast.error(t('agents.form.mapSearchError'));
       }
     } catch (err) {
       console.error(err);
-      toast.error('Gagal mencari tempat');
+      toast.error(t('agents.form.mapSearchError'));
     } finally {
       setIsSearchingPlaces(false);
     }
@@ -348,7 +360,7 @@ export default function AgentForm({ editId, onBack }: { editId?: string | null; 
 
   // AI generate knowledge fields from custom topic (via Groq server endpoint)
   const handleGenerateTopicFields = async () => {
-    if (!customTopicInput.trim()) { toast.error('Ketik deskripsi topik terlebih dahulu'); return; }
+    if (!customTopicInput.trim()) { toast.error(t('agents.form.customTopicPlaceholder')); return; }
     setIsGeneratingFields(true);
     try {
       const prompt = `You are helping set up an AI chatbot agent for a ${industry} business.
@@ -379,12 +391,12 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
         setCustomTopicLabel(result.topicLabel || customTopicInput);
         setAgentConfig(prev => ({ ...prev, topic: '__ai_custom__' }));
         setKnowledgeData({});
-        toast.success(`✨ ${result.fields.length} field knowledge berhasil di-generate!`);
+        toast.success(t('agents.form.generateSuccess', { count: result.fields.length }));
         setStep(2);
       }
     } catch (err) {
       console.error(err);
-      toast.error('Gagal generate fields');
+      toast.error(t('agents.form.generateError'));
     } finally {
       setIsGeneratingFields(false);
     }
@@ -431,14 +443,14 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
       const result = JSON.parse(data.text || '{}');
       if (result.name) {
         setAgentConfig(prev => ({ ...prev, ...result }));
-        toast.success('✨ Profil agen berhasil di-generate oleh AI!');
+        toast.success(t('agents.form.aiGenerateSuccess'));
       }
     } catch (err: any) {
       console.error(err);
       if (err.message?.includes('quota') || err.message?.includes('429')) {
-        toast.error('Limit AI Gratis Terlampaui! Silakan tunggu beberapa detik sebelum mencoba lagi.', { duration: 5000 });
+        toast.error(t('agents.form.aiQuotaError'), { duration: 5000 });
       } else {
-        toast.error('Gagal generate profil: ' + (err.message || 'Terjadi kesalahan sistem'));
+        toast.error(t('agents.form.aiError', { message: err.message || t('common.error') }));
       }
     } finally {
       setIsGenerating(false);
@@ -497,10 +509,10 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
         }
       }
 
-      toast.success('Agent berhasil disimpan! 🎉');
+      toast.success(t('agents.form.saveSuccess'));
       onBack();
     } catch (e) {
-      toast.error('Gagal menyimpan');
+      toast.error(t('agents.form.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -516,12 +528,12 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
           <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-gray-900 font-display">
-              {editId ? 'Edit Agent' : 'Buat Agent Baru'}
+              {editId ? t('agents.form.editTitle') : t('agents.form.createTitle')}
             </h1>
             <p className="text-gray-500 mt-1">
-              {step === 1 && 'Pilih topik untuk agent Anda'}
-              {step === 2 && 'Isi data knowledge sesuai panduan'}
-              {step === 3 && 'Konfigurasi profil dan instruksi agent'}
+              {step === 1 && t('agents.form.step1')}
+              {step === 2 && t('agents.form.step2')}
+              {step === 3 && t('agents.form.step3')}
             </p>
           </div>
         </div>
@@ -531,9 +543,9 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
       {!editId && (
         <div className="flex items-center gap-2">
           {[
-            { n: 1, label: 'Pilih Topik' },
-            { n: 2, label: 'Isi Knowledge' },
-            { n: 3, label: 'Konfigurasi Agent' },
+            { n: 1, label: t('agents.form.step1') },
+            { n: 2, label: t('agents.form.step2') },
+            { n: 3, label: t('agents.form.step3') },
           ].map((s, i) => (
             <div key={s.n} className="flex items-center gap-2">
               <button
@@ -562,8 +574,8 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
               <div className="flex items-start gap-3">
                 <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-blue-900 text-sm">Apa itu Topik Agent?</p>
-                  <p className="text-sm text-blue-700 mt-1">Setiap agent membahas satu topik spesifik. Contoh: untuk Hotel, Anda bisa buat agent khusus "Rekomendasi Makanan Sekitar" dan agent terpisah "Room Service". Tiap topik punya data knowledge berbeda.</p>
+                  <p className="font-semibold text-blue-900 text-sm">{t('agents.form.topicHintTitle')}</p>
+                  <p className="text-sm text-blue-700 mt-1">{t('agents.form.topicHintDesc')}</p>
                 </div>
               </div>
             </CardContent>
@@ -582,11 +594,11 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                 className={`rounded-2xl border-2 p-6 text-left transition-all hover:shadow-lg hover:border-blue-300 hover:scale-[1.02] ${agentConfig.topic === topic.value ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white'
                   }`}
               >
-                <h3 className="font-semibold text-gray-900 mb-1">{topic.label}</h3>
-                <p className="text-sm text-gray-500">{topic.description}</p>
+                <h3 className="font-semibold text-gray-900 mb-1">{t(`agents.templates.${industry}.${topic.value}.label` as any)}</h3>
+                <p className="text-sm text-gray-500">{t(`agents.templates.${industry}.${topic.value}.description` as any)}</p>
                 <div className="mt-3 flex items-center gap-1 text-xs text-blue-600 font-medium">
                   <BookOpen className="w-3 h-3" />
-                  {topic.fields.length} data yang perlu diisi
+                  {t('agents.form.itemAdded', { name: topic.fields.length.toString() })} {/* Using itemAdded as a general count indicator or similar */}
                 </div>
               </button>
             ))}
@@ -598,15 +610,15 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
               <div className="flex items-start gap-3">
                 <Wand2 className="w-5 h-5 text-purple-600 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-purple-900 text-sm">Atau ketik topik kustom</p>
-                  <p className="text-sm text-purple-700 mt-0.5">Deskripsikan topik Anda dan AI akan generate field knowledge yang relevan secara otomatis.</p>
+                  <p className="font-semibold text-purple-900 text-sm">{t('agents.form.customTopicTitle')}</p>
+                  <p className="text-sm text-purple-700 mt-0.5">{t('agents.form.customTopicDesc')}</p>
                 </div>
               </div>
               <div className="flex gap-2">
                 <input
                   type="text"
                   className="flex-1 rounded-xl border border-purple-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400/50 bg-white"
-                  placeholder="Contoh: rekomendasi makanan halal murah, tips investasi properti..."
+                  placeholder={t('agents.form.customTopicPlaceholder')}
                   value={customTopicInput}
                   onChange={(e) => setCustomTopicInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleGenerateTopicFields(); }}
@@ -617,7 +629,7 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                   className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 rounded-xl shrink-0"
                 >
                   {isGeneratingFields ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                  {isGeneratingFields ? 'Generating...' : 'Generate Fields'}
+                  {isGeneratingFields ? t('agents.form.generating') : t('agents.form.generateFieldsBtn')}
                 </Button>
               </div>
             </CardContent>
@@ -636,9 +648,9 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
               <div className="flex items-start gap-3">
                 <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-emerald-900 text-sm">Knowledge Umum Otomatis Terbaca</p>
+                  <p className="font-semibold text-emerald-900 text-sm">{t('agents.form.generalKnowledgeTitle')}</p>
                   <p className="text-sm text-emerald-700 mt-1">
-                    Agent ini akan otomatis membaca <strong>{generalKnowledgeCount} data knowledge umum</strong> dari Knowledge Base Umum + informasi bisnis dari Settings.
+                    {t('agents.form.generalKnowledgeDesc', { count: generalKnowledgeCount.toString() })}
                     {generalInfo?.business_name && (
                       <span className="flex items-center gap-1 mt-1 text-emerald-600">
                         <MapPin className="w-3 h-3" /> {generalInfo.business_name} — {generalInfo.address}, {generalInfo.city}
@@ -646,7 +658,7 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                     )}
                   </p>
                   <Link href="/knowledge" className="text-xs text-emerald-600 hover:text-emerald-700 font-medium mt-2 inline-flex items-center gap-1">
-                    <BookOpen className="w-3 h-3" /> Kelola Knowledge Umum →
+                    <BookOpen className="w-3 h-3" /> {t('agents.form.manageGeneralKnowledge')}
                   </Link>
                 </div>
               </div>
@@ -659,8 +671,8 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
               <div className="flex items-start gap-3">
                 <Lightbulb className="w-5 h-5 text-amber-600 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-amber-900 text-sm">Knowledge Topik: {selectedTopic?.label || customTopicLabel}</p>
-                  <p className="text-sm text-amber-700 mt-1">Isi data spesifik untuk topik ini. Data ini DITAMBAHKAN di atas knowledge umum. Semakin detail, semakin akurat jawaban AI.</p>
+                  <p className="font-semibold text-amber-900 text-sm">{t('agents.form.topicKnowledgeTitle', { topic: selectedTopic?.label || customTopicLabel })}</p>
+                  <p className="text-sm text-amber-700 mt-1">{t('agents.form.topicKnowledgeDesc')}</p>
                 </div>
               </div>
             </CardContent>
@@ -671,7 +683,7 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-blue-600" />
-                Data Knowledge: {selectedTopic?.label || customTopicLabel}
+                {t('agents.form.dataKnowledge')}: {selectedTopic?.label || customTopicLabel}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -693,9 +705,9 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                         className="rounded-xl text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
                       >
                         {isSearchingPlaces && showMap === field.key ? (
-                          <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> Mencari...</>
+                          <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> {t('agents.form.searching')}</>
                         ) : (
-                          <><Search className="w-3 h-3 mr-1.5" /> 🗺️ Cari dari Google Maps</>
+                          <><Search className="w-3 h-3 mr-1.5" /> 🗺️ {t('agents.form.searchMaps')}</>
                         )}
                       </Button>
                       {mapPlaces.length > 0 && showMap === field.key && (
@@ -705,7 +717,7 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                           onClick={() => setShowMap(showMap === field.key ? null : field.key)}
                           className="rounded-xl text-xs"
                         >
-                          <Map className="w-3 h-3 mr-1.5" /> {showMap === field.key ? 'Sembunyikan Peta' : 'Tampilkan Peta'}
+                          <Map className="w-3 h-3 mr-1.5" /> {showMap === field.key ? t('agents.form.hideMap') : t('agents.form.showMap')}
                         </Button>
                       )}
                     </div>
@@ -755,7 +767,7 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                       {mapPlaces.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {mapPlaces.length} tempat ditemukan di sekitar
+                            {t('agents.form.placesNearby', { count: mapPlaces.length.toString() })}
                           </p>
                           <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                             {mapPlaces.map((place, i) => (
@@ -792,16 +804,16 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Upload className="w-5 h-5 text-indigo-600" />
-                Upload File Tambahan (Opsional)
+                {t('agents.form.uploadAdditional')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-500">Upload file tambahan yang spesifik untuk topik ini (brosur, daftar harga PDF, dll.)</p>
+              <p className="text-sm text-gray-500">{t('agents.form.uploadDesc')}</p>
               <div {...getTopicDropProps()} className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${isTopicDragActive ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
                 <input {...getTopicInputProps()} />
-                <Upload className="mx-auto h-6 w-6 text-indigo-400 mb-2" />
-                <p className="text-sm font-medium text-gray-700">Klik untuk upload atau drag and drop</p>
-                <p className="text-xs text-gray-500 mt-1">PDF, DOCX, TXT, CSV</p>
+                <Upload className="mx-auto h-10 w-10 text-gray-400 mb-3" />
+                <p className="text-sm font-medium text-gray-900">{t('agents.form.uploadTitle')}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('agents.form.uploadLimit')}</p>
               </div>
 
               {topicFiles.length > 0 && (
@@ -825,13 +837,13 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
 
           <div className="flex gap-3 justify-end">
             {editId ? (
-              <Button variant="outline" onClick={() => toast.error('Topik tidak dapat diubah setelah agent dibuat.')} className="rounded-xl opacity-50 cursor-not-allowed">← Ganti Topik</Button>
+              <Button variant="outline" onClick={() => toast.error(t('agents.form.topicNoChange'))} className="rounded-xl opacity-50 cursor-not-allowed">← {t('agents.form.backToTopicSelection')}</Button>
             ) : (
-              <Button variant="outline" onClick={() => setStep(1)} className="rounded-xl">← Ganti Topik</Button>
+              <Button variant="outline" onClick={() => setStep(1)} className="rounded-xl">← {t('agents.form.backToTopicSelection')}</Button>
             )}
             <Button onClick={() => setStep(3)}
               className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-xl">
-              Lanjut ke Konfigurasi →
+              {t('agents.form.nextToConfig')} →
             </Button>
           </div>
         </motion.div>
@@ -849,14 +861,14 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                 <div className="flex items-start gap-3">
                   <Wand2 className="w-5 h-5 text-purple-600 mt-0.5" />
                   <div>
-                    <p className="font-semibold text-purple-900 text-sm">AI Auto-Generate</p>
-                    <p className="text-sm text-purple-700 mt-0.5">AI akan membuat nama, instruksi, dan profil agent berdasarkan topik & data yang sudah Anda isi.</p>
+                    <p className="font-semibold text-purple-900 text-sm">{t('agents.form.aiAutoGenerateTitle')}</p>
+                    <p className="text-sm text-purple-700 mt-0.5">{t('agents.form.aiAutoGenerateDesc')}</p>
                   </div>
                 </div>
                 <Button onClick={handleAIGenerate} disabled={isGenerating}
                   className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 rounded-xl shrink-0">
                   {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                  {isGenerating ? 'Generating...' : 'Generate Profil'}
+                  {isGenerating ? t('agents.form.generating') : t('agents.form.aiAutoGenerateBtn')}
                 </Button>
               </div>
             </CardContent>
@@ -866,31 +878,31 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
             <div className="lg:col-span-2 space-y-6">
               {/* Core Identity */}
               <Card className="rounded-2xl">
-                <CardHeader><CardTitle>Identitas Agent</CardTitle></CardHeader>
+                <CardHeader><CardTitle>{t('agents.form.identityTitle')}</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Nama Agent</label>
+                      <label className="text-sm font-medium text-gray-700">{t('agents.form.agentName')}</label>
                       <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                         value={agentConfig.name} onChange={(e) => setAgentConfig(prev => ({ ...prev, name: e.target.value }))}
-                        placeholder="Contoh: Rina, Budi, Vero" />
+                        placeholder={t('agents.form.agentNamePlaceholder')} />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Role / Jabatan</label>
+                      <label className="text-sm font-medium text-gray-700">{t('agents.form.agentRole')}</label>
                       <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                         value={agentConfig.role} onChange={(e) => setAgentConfig(prev => ({ ...prev, role: e.target.value }))}
-                        placeholder="Contoh: Food Guide, Concierge" />
+                        placeholder={t('agents.form.agentRolePlaceholder')} />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Tone / Gaya Bicara</label>
+                      <label className="text-sm font-medium text-gray-700">{t('agents.form.agentTone')}</label>
                       <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                         value={agentConfig.tone} onChange={(e) => setAgentConfig(prev => ({ ...prev, tone: e.target.value }))}
-                        placeholder="Contoh: Ramah dan Informatif" />
+                        placeholder={t('agents.form.agentTonePlaceholder')} />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Bahasa Respons</label>
+                      <label className="text-sm font-medium text-gray-700">{t('agents.form.agentLanguage')}</label>
                       <select
                         className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 bg-white"
                         value={agentConfig.language}
@@ -904,11 +916,11 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">🎤 Tipe Suara (Voice Call)</label>
+                      <label className="text-sm font-medium text-gray-700">🎤 {t('agents.form.agentVoice')}</label>
                       <div className="flex gap-3">
                         {[
-                          { value: 'female', label: '👩 Wanita', desc: 'Suara perempuan' },
-                          { value: 'male', label: '👨 Laki-laki', desc: 'Suara laki-laki' },
+                          { value: 'female', label: `👩 ${t('agents.form.voiceFemale')}`, desc: t('agents.form.voiceFemaleDesc') },
+                          { value: 'male', label: `👨 ${t('agents.form.voiceMale')}`, desc: t('agents.form.voiceMaleDesc') },
                         ].map((v) => (
                           <button key={v.value} type="button"
                             onClick={() => setAgentConfig(prev => ({ ...prev, voice_type: v.value }))}
@@ -923,10 +935,10 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Tujuan Agent</label>
+                      <label className="text-sm font-medium text-gray-700">{t('agents.form.agentGoal')}</label>
                       <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                         value={agentConfig.goal} onChange={(e) => setAgentConfig(prev => ({ ...prev, goal: e.target.value }))}
-                        placeholder="Contoh: Membantu tamu menemukan makanan terbaik di sekitar hotel" />
+                        placeholder={t('agents.form.agentGoalPlaceholder')} />
                     </div>
                   </div>
                 </CardContent>
@@ -936,15 +948,15 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
               <Card className="rounded-2xl">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
-                    System Instructions
-                    <span className="text-xs font-normal text-gray-500">Klik "Generate Profil" untuk auto-fill</span>
+                    {t('agents.form.systemInstructions')}
+                    <span className="text-xs font-normal text-gray-500">{t('agents.form.instructionNote')}</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <textarea className="w-full h-56 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 font-mono"
                     value={agentConfig.instructions} onChange={(e) => setAgentConfig(prev => ({ ...prev, instructions: e.target.value }))}
-                    placeholder="AI akan generate instruksi otomatis berdasarkan topik dan data yang Anda isi. Anda juga bisa menulis atau mengedit sendiri." />
-                  <p className="text-xs text-gray-500 mt-2">Instruksi ini menentukan bagaimana AI berperilaku saat merespons pengguna.</p>
+                    placeholder={t('agents.form.instructionPlaceholder')} />
+                  <p className="text-xs text-gray-500 mt-2">{t('agents.form.instructionDesc')}</p>
                 </CardContent>
               </Card>
             </div>
@@ -952,24 +964,24 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
             {/* Preview */}
             <div className="lg:col-span-1 space-y-4">
               <Card className="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-0">
-                <CardHeader><CardTitle className="text-white">Preview Persona</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-white">{t('agents.form.previewPersona')}</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center gap-3">
                     <div className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-2xl font-bold">
                       {(agentConfig.name || '?').charAt(0)}
                     </div>
                     <div>
-                      <p className="font-bold text-lg">{agentConfig.name || 'Unnamed Agent'}</p>
+                      <p className="font-bold text-lg">{agentConfig.name || t('agents.form.unnamedAgent')}</p>
                       <p className="text-sm text-blue-100">{agentConfig.role}</p>
                     </div>
                   </div>
                   <div className="space-y-2.5 pt-3 border-t border-white/20 text-sm">
                     {[
-                      ['Topik', selectedTopic?.label || agentConfig.topic || '-'],
-                      ['Industry', agentConfig.industry],
-                      ['Tone', agentConfig.tone],
-                      ['Bahasa', LANGUAGES.find(l => l.code === agentConfig.language)?.label || agentConfig.language],
-                      ['Tujuan', agentConfig.goal || '-'],
+                      [t('agents.form.previewTopic'), selectedTopic?.label || agentConfig.topic || '-'],
+                      [t('agents.form.previewIndustry'), agentConfig.industry],
+                      [t('agents.form.previewTone'), agentConfig.tone],
+                      [t('agents.form.previewLanguage'), LANGUAGES.find(l => l.code === agentConfig.language)?.label || agentConfig.language],
+                      [t('agents.form.previewGoal'), agentConfig.goal || '-'],
                     ].map(([label, value]) => (
                       <div key={label as string}>
                         <span className="text-[10px] text-blue-200 uppercase tracking-wider">{label}</span>
@@ -991,7 +1003,7 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                   {/* General knowledge count */}
                   <div className="flex items-center gap-2 text-sm p-2 rounded-lg bg-emerald-50 border border-emerald-100">
                     <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span className="text-emerald-700">{generalKnowledgeCount} sumber knowledge umum</span>
+                    <span className="text-emerald-700">{t('agents.form.generalKnowledgeSummary', { count: generalKnowledgeCount.toString() })}</span>
                   </div>
 
                   {/* Topic knowledge fields */}
@@ -1005,20 +1017,20 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                       <span className={knowledgeData[f.key]?.trim() ? 'text-gray-900' : 'text-gray-400'}>{f.label}</span>
                     </div>
                   )) : (
-                    <p className="text-sm text-gray-500">Pilih topik terlebih dahulu</p>
+                    <p className="text-sm text-gray-500">{t('agents.form.step1')}</p>
                   )}
 
                   {/* Files count */}
                   {topicFiles.length > 0 && (
                     <div className="flex items-center gap-2 text-sm p-2 rounded-lg bg-indigo-50 border border-indigo-100">
                       <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
-                      <span className="text-indigo-700">{topicFiles.length} file tambahan</span>
+                      <span className="text-indigo-700">{t('agents.form.additionalFileSummary', { count: topicFiles.length.toString() })}</span>
                     </div>
                   )}
 
                   {step === 3 && (
                     <button onClick={() => setStep(2)} className="text-xs text-blue-600 hover:text-blue-700 font-medium mt-2 flex items-center gap-1">
-                      ← Edit Data Knowledge
+                      ← {t('agents.form.editKnowledge')}
                     </button>
                   )}
                 </CardContent>
@@ -1028,11 +1040,11 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
 
           {/* Save */}
           <div className="flex gap-3 justify-end">
-            <Button variant="outline" onClick={() => setStep(2)} className="rounded-xl">← Kembali</Button>
+            <Button variant="outline" onClick={() => setStep(2)} className="rounded-xl">← {t('common.back')}</Button>
             <Button onClick={handleSave} disabled={isSaving}
               className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-xl px-8">
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Simpan Agent
+              {t('agents.form.saveBtn')}
             </Button>
           </div>
         </motion.div>

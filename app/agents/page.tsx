@@ -8,9 +8,11 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import AgentForm from './AgentForm';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function AgentsPage() {
     const { admin, agents, setAgents } = useStore();
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(true);
     const [showQR, setShowQR] = useState<string | null>(null);
     const [appUrl, setAppUrl] = useState('');
@@ -34,32 +36,40 @@ export default function AgentsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this agent?')) return;
+        if (!confirm(t('agents.deleteConfirm'))) return;
         try {
-            await fetch(`/api/agents?id=${id}`, { method: 'DELETE' });
-            fetchAgents();
-            toast.success('Agent deleted');
-        } catch (e) {
-            toast.error('Failed to delete agent');
+            const res = await fetch(`/api/agents?id=${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setAgents(agents.filter(a => a.id !== id));
+                toast.success(t('agents.deletedSuccess'));
+            } else {
+                toast.error(t('agents.deleteError'));
+            }
+        } catch (err) {
+            toast.error(t('agents.deleteError'));
         }
     };
 
     const handleToggle = async (agent: AgentConfig) => {
         try {
-            await fetch('/api/agents', {
+            const res = await fetch('/api/agents', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...agent, is_active: agent.is_active ? 0 : 1 }),
             });
-            fetchAgents();
-        } catch (e) {
-            toast.error('Failed to update agent');
+            if (res.ok) {
+                setAgents(agents.map(a => a.id === agent.id ? { ...a, is_active: agent.is_active ? 0 : 1 } : a));
+            } else {
+                toast.error(t('agents.toggleError'));
+            }
+        } catch (err) {
+            toast.error(t('agents.toggleError'));
         }
     };
 
     const copyLink = (id: string) => {
         navigator.clipboard.writeText(`${appUrl}/bot/${id}`);
-        toast.success('Bot link copied to clipboard!');
+        toast.success(t('agents.linkCopied'));
     };
 
     const handleBackFromForm = () => {
@@ -85,29 +95,29 @@ export default function AgentsPage() {
         <div className="space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 font-display">My Agents</h1>
-                    <p className="text-gray-500 mt-2">Create and manage your AI chatbot agents</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 font-display">{t('agents.title')}</h1>
+                    <p className="text-gray-500 mt-2">{t('agents.subtitle')}</p>
                 </div>
                 <button
                     onClick={() => { setEditAgentId(null); setView('create'); }}
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
                 >
                     <Plus className="w-4 h-4" />
-                    New Agent
+                    {t('agents.newAgent')}
                 </button>
             </div>
 
             {agents.length === 0 ? (
                 <div className="rounded-2xl border-2 border-dashed border-gray-200 p-16 text-center">
                     <Bot className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No agents yet</h3>
-                    <p className="text-gray-500 mb-6">Create your first AI agent to get started</p>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('agents.noAgentsTitle')}</h3>
+                    <p className="text-gray-500 mb-6">{t('agents.noAgentsSubtitle')}</p>
                     <button
                         onClick={() => { setEditAgentId(null); setView('create'); }}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
                     >
                         <Plus className="w-4 h-4" />
-                        Create Agent
+                        {t('agents.createAgentBtn')}
                     </button>
                 </div>
             ) : (
@@ -131,7 +141,7 @@ export default function AgentsPage() {
                                             <p className="text-xs text-gray-500">{agent.role}</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => handleToggle(agent)} title={agent.is_active ? 'Active' : 'Inactive'}>
+                                    <button onClick={() => handleToggle(agent)} title={agent.is_active ? t('agents.active') : t('agents.inactive')}>
                                         {agent.is_active ? (
                                             <ToggleRight className="w-6 h-6 text-emerald-500" />
                                         ) : (
@@ -142,19 +152,19 @@ export default function AgentsPage() {
 
                                 <div className="space-y-2 mb-4">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Industry</span>
+                                        <span className="text-gray-500">{t('agents.industry')}</span>
                                         <span className="font-medium text-gray-900">{agent.industry}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Tokens Used</span>
+                                        <span className="text-gray-500">{t('agents.tokensUsed')}</span>
                                         <span className="font-mono text-gray-900">{agent.token_usage?.toLocaleString() || 0}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Knowledge Sources</span>
+                                        <span className="text-gray-500">{t('agents.knowledgeSources')}</span>
                                         <span className="font-medium text-gray-900">{agent.knowledge_count || 0}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Conversations</span>
+                                        <span className="text-gray-500">{t('agents.conversations')}</span>
                                         <span className="font-medium text-gray-900">{agent.conversation_count || 0}</span>
                                     </div>
                                 </div>
@@ -166,7 +176,7 @@ export default function AgentsPage() {
                                         className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
                                     >
                                         <QrCode className="w-4 h-4" />
-                                        {showQR === agent.id ? 'Hide QR Code' : 'Show QR Code'}
+                                        {showQR === agent.id ? t('agents.hideQR') : t('agents.showQR')}
                                     </button>
 
                                     <AnimatePresence>
@@ -201,7 +211,7 @@ export default function AgentsPage() {
                                     className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium text-gray-700 hover:text-blue-600 py-2 rounded-lg hover:bg-blue-50 transition-colors"
                                 >
                                     <Pencil className="w-3.5 h-3.5" />
-                                    Edit
+                                    {t('common.edit')}
                                 </button>
                                 <button
                                     onClick={() => copyLink(agent.id)}

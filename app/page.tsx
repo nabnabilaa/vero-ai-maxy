@@ -8,7 +8,7 @@ import { motion } from 'motion/react';
 import { useTranslation } from '@/hooks/useTranslation';
 
 export default function DashboardPage() {
-  const { admin } = useStore();
+  const { admin, language } = useStore();
   const { t } = useTranslation();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -18,7 +18,6 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch('/api/analytics')
       .then(r => r.json())
-      .then(data => { setStats(data); setLoading(false); })
       .catch(() => setLoading(false));
     fetch(`/api/analytics/tokens?period=${tokenPeriod}`)
       .then(r => r.json()).then(d => setTokenData(d)).catch(() => { });
@@ -31,14 +30,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  const industryGreeting: Record<string, string> = {
-    Hotel: 'Manage your hotel AI concierge agents',
-    Retail: 'Manage your retail AI shopping assistants',
-    Restaurant: 'Manage your restaurant AI service agents',
-    'Real Estate': 'Manage your property AI consultation agents',
-    General: 'Manage your multi-purpose AI agents',
-  };
 
   return (
     <div className="space-y-8">
@@ -53,7 +44,7 @@ export default function DashboardPage() {
             {t('dashboard.welcome', { name: admin?.name?.split(' ')[0] || '' })}
           </h1>
           <p className="text-gray-500 mt-2">
-            {industryGreeting[admin?.industry || 'General']}
+            {t(`dashboard.industryGreeting.${admin?.industry || 'General'}` as any)}
           </p>
         </div>
         <Link href="/agents">
@@ -135,7 +126,7 @@ export default function DashboardPage() {
             <div className="rounded-xl bg-green-50 border border-green-100 p-4">
               <p className="text-xs text-green-500 font-medium">{t('dashboard.savedFromCache')}</p>
               <p className="text-2xl font-bold text-green-700">~{tokenData.totals?.estimatedSaved?.toLocaleString() || 0}</p>
-              <p className="text-[10px] text-green-400 mt-1">{tokenData.totals?.cachedRequests || 0} cached {t('dashboard.requests')}</p>
+              <p className="text-[10px] text-green-400 mt-1">{tokenData.totals?.cachedRequests || 0} {t('dashboard.cachedRequests')} {t('dashboard.requests')}</p>
             </div>
             <div className="rounded-xl bg-purple-50 border border-purple-100 p-4">
               <p className="text-xs text-purple-500 font-medium">{t('dashboard.cacheHitRate')}</p>
@@ -197,11 +188,11 @@ export default function DashboardPage() {
                       <span className="text-lg">{log.source === 'chat' ? '💬' : log.source === 'voice' ? '📞' : '🔧'}</span>
                       <div>
                         <p className="font-medium text-gray-800">{log.agent_name || t('dashboard.system')} — <span className="text-gray-500 font-normal">{log.action}</span></p>
-                        <p className="text-[10px] text-gray-400">{new Date(log.created_at).toLocaleString('id-ID')}</p>
+                        <p className="text-[10px] text-gray-400">{new Date(log.created_at).toLocaleString(language === 'id' ? 'id-ID' : 'en-US')}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className={`font-bold ${log.from_cache ? 'text-green-600' : 'text-gray-900'}`}>{log.from_cache ? '✓ cached' : `${Number(log.tokens_used).toLocaleString()} token`}</span>
+                      <span className={`font-bold ${log.from_cache ? 'text-green-600' : 'text-gray-900'}`}>{log.from_cache ? '✓ cached' : `${Number(log.tokens_used).toLocaleString()} tokens`}</span>
                     </div>
                   </div>
                 ))}
@@ -227,13 +218,13 @@ export default function DashboardPage() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{u.agent_name}</span>
-                    <span className="text-[10px] text-gray-400">{new Date(u.created_at).toLocaleString('id-ID')}</span>
+                    <span className="text-[10px] text-gray-400">{new Date(u.created_at).toLocaleString(language === 'id' ? 'id-ID' : 'en-US')}</span>
                   </div>
                   <p className="text-sm text-gray-800 font-medium">"{u.question}"</p>
                 </div>
                 <Link href="/knowledge">
                   <button className="text-xs px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium rounded-lg transition-colors border border-indigo-100">
-                    Tambah Knowledge
+                    {t('dashboard.addKnowledge')}
                   </button>
                 </Link>
               </div>
@@ -271,7 +262,7 @@ export default function DashboardPage() {
                     {conv.is_complaint === 1 && (
                       <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">{t('dashboard.complaint')}</span>
                     )}
-                    <span className="text-xs text-gray-400">{new Date(conv.started_at).toLocaleDateString('id-ID')}</span>
+                    <span className="text-xs text-gray-400">{new Date(conv.started_at).toLocaleDateString(language === 'id' ? 'id-ID' : 'en-US')}</span>
                   </div>
                 </div>
               ))}

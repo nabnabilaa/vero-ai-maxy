@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3, MessageSquare, Phone, Clock, Eye, Bot, User, Sparkles, Loader2, ThumbsUp, ThumbsDown, Minus, Package, UserSquare2, ChevronDown, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function AnalyticsPage() {
+    const { t } = useTranslation();
     const [conversations, setConversations] = useState<any[]>([]);
     const [selectedConv, setSelectedConv] = useState<any>(null);
     const [messages, setMessages] = useState<any[]>([]);
@@ -50,7 +52,7 @@ export default function AnalyticsPage() {
         setAnalyzingTopics(prev => ({ ...prev, [topicName]: true }));
         setActiveView('analysis');
         setActiveAnalysisTopic(topicName);
-        const loadingToast = toast.loading(`Menganalisis percakapan untuk topik ${topicName}...`);
+        const loadingToast = toast.loading(t('analytics.toasts.analyzing', { topic: topicName }));
 
         try {
             const res = await fetch('/api/analytics/live', {
@@ -60,12 +62,12 @@ export default function AnalyticsPage() {
             });
             const data = await res.json();
 
-            if (!res.ok) throw new Error(data.error || 'Failed to analyze');
+            if (!res.ok) throw new Error(data.error || t('analytics.toasts.error'));
 
             setTopicAnalysis(prev => ({ ...prev, [topicName]: data.analysis }));
-            toast.success(`✨ Analisis topik ${topicName} selesai!`, { id: loadingToast });
+            toast.success(t('analytics.toasts.success', { topic: topicName }), { id: loadingToast });
         } catch (e: any) {
-            toast.error(e.message || 'Gagal menganalisis', { id: loadingToast });
+            toast.error(e.message || t('analytics.toasts.error'), { id: loadingToast });
         } finally {
             setAnalyzingTopics(prev => ({ ...prev, [topicName]: false }));
         }
@@ -101,16 +103,16 @@ export default function AnalyticsPage() {
     return (
         <div className="space-y-8 max-w-[1400px] mx-auto min-h-screen">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900 font-display">Analytics & History</h1>
-                <p className="text-gray-500 mt-2">Monitor percakapan, penggunaan token, dan Live Analysis per topik agent.</p>
+                <h1 className="text-3xl font-bold tracking-tight text-gray-900 font-display">{t('analytics.title')}</h1>
+                <p className="text-gray-500 mt-2">{t('analytics.subtitle')}</p>
             </div>
 
             {/* Stats Overview */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard icon={MessageSquare} label="Total Conversations" value={stats?.totalConversations || 0} color="blue" />
-                <StatCard icon={BarChart3} label="Total Tokens" value={stats?.totalTokens?.toLocaleString() || '0'} color="indigo" />
-                <StatCard icon={Bot} label="Active Agents" value={stats?.totalAgents || 0} color="emerald" />
-                <StatCard icon={Clock} label="Today" value={stats?.todayConversations || 0} color="amber" />
+                <StatCard icon={MessageSquare} label={t('analytics.stats.totalConversations')} value={stats?.totalConversations || 0} color="blue" />
+                <StatCard icon={BarChart3} label={t('analytics.stats.totalTokens')} value={stats?.totalTokens?.toLocaleString() || '0'} color="indigo" />
+                <StatCard icon={Bot} label={t('analytics.stats.activeAgents')} value={stats?.totalAgents || 0} color="emerald" />
+                <StatCard icon={Clock} label={t('analytics.stats.today')} value={stats?.todayConversations || 0} color="amber" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[75vh]">
@@ -120,14 +122,14 @@ export default function AnalyticsPage() {
                     <Card className="rounded-2xl h-full flex flex-col shadow-sm border-gray-100 overflow-hidden">
                         <CardHeader className="bg-white z-10 border-b border-gray-50 pb-4">
                             <CardTitle className="text-base flex items-center justify-between">
-                                Daftar Percakapan Terkini
-                                <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{conversations.length} total</span>
+                                {t('analytics.recentList')}
+                                <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{t('analytics.totalCount', { count: conversations.length.toString() })}</span>
                             </CardTitle>
                         </CardHeader>
 
                         <CardContent className="flex-1 overflow-y-auto space-y-4 p-4 bg-gray-50/50">
                             {Object.keys(groupedConversations).length === 0 ? (
-                                <div className="text-center py-10 text-gray-500 text-sm">Belum ada percakapan</div>
+                                <div className="text-center py-10 text-gray-500 text-sm">{t('analytics.noConversations')}</div>
                             ) : Object.entries(groupedConversations).map(([topic, data]) => {
                                 const isExpanded = expandedTopic === topic;
                                 const analysis = topicAnalysis[topic];
@@ -145,8 +147,8 @@ export default function AnalyticsPage() {
                                                     <Bot className="w-4 h-4" />
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-sm font-bold text-gray-900 line-clamp-1">Topik: {topic.replace('__ai_custom__', 'Custom AI Topic')}</h3>
-                                                    <p className="text-xs text-gray-500">{data.conversations.length} percakapan</p>
+                                                    <h3 className="text-sm font-bold text-gray-900 line-clamp-1">{t('analytics.topicLabel', { topic: topic.replace('__ai_custom__', 'Custom AI Topic') })}</h3>
+                                                    <p className="text-xs text-gray-500">{t('analytics.convCount', { count: data.conversations.length.toString() })}</p>
                                                 </div>
                                             </div>
                                             {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
@@ -160,7 +162,7 @@ export default function AnalyticsPage() {
                                                     {/* AI Analysis Button — compact in sidebar */}
                                                     <div className="px-4 pt-3 pb-2 bg-indigo-50/30 border-b border-gray-100">
                                                         <div className="flex items-center justify-between">
-                                                            <h4 className="text-xs font-bold text-indigo-900 tracking-wider uppercase flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> AI Live Analysis</h4>
+                                                            <h4 className="text-xs font-bold text-indigo-900 tracking-wider uppercase flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> {t('analytics.liveAnalysis')}</h4>
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline"
@@ -169,7 +171,7 @@ export default function AnalyticsPage() {
                                                                 disabled={isAnalyzing}
                                                             >
                                                                 {isAnalyzing ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Bot className="w-3 h-3 mr-1" />}
-                                                                {isAnalyzing ? 'Analyzing...' : (analysis ? 'Refresh' : 'Run Analysis')}
+                                                                {isAnalyzing ? t('analytics.analyzing') : (analysis ? t('analytics.refresh') : t('analytics.runAnalysis'))}
                                                             </Button>
                                                         </div>
 
@@ -186,7 +188,7 @@ export default function AnalyticsPage() {
                                                                         analysis.sentiment === 'Negative' ? <ThumbsDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
                                                                 </div>
                                                                 <span className="text-xs text-gray-700 font-medium">{analysis.sentiment}</span>
-                                                                <span className="text-[10px] text-gray-400 ml-auto">Klik untuk detail →</span>
+                                                                <span className="text-[10px] text-gray-400 ml-auto">{t('analytics.clickForDetail')}</span>
                                                             </button>
                                                         )}
                                                     </div>
@@ -203,14 +205,14 @@ export default function AnalyticsPage() {
                                                                 <div className="flex items-center justify-between mb-1">
                                                                     <div className="flex items-center gap-2">
                                                                         {conv.session_type === 'voice' ? <Phone className="w-3.5 h-3.5 text-purple-500" /> : <MessageSquare className="w-3.5 h-3.5 text-blue-500" />}
-                                                                        <span className="text-sm font-medium text-gray-900 truncate">{conv.user_name || 'Anonymous'}</span>
+                                                                        <span className="text-sm font-medium text-gray-900 truncate">{conv.user_name || t('analytics.anonymous')}</span>
                                                                     </div>
-                                                                    {conv.is_complaint === 1 ? <span className="text-[10px] bg-red-50 border border-red-100 text-red-600 px-1.5 py-0.5 rounded-full">Complaint</span>
+                                                                    {conv.is_complaint === 1 ? <span className="text-[10px] bg-red-50 border border-red-100 text-red-600 px-1.5 py-0.5 rounded-full">{t('analytics.complaint')}</span>
                                                                         : <span className="text-[10px] text-gray-400">{new Date(conv.started_at).toLocaleDateString()}</span>}
                                                                 </div>
                                                                 <p className="text-xs text-gray-500 flex items-center gap-2">
                                                                     <span className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">{conv.agent_name}</span>
-                                                                    {conv.message_count} messages
+                                                                    {t('analytics.messagesCount', { count: conv.message_count.toString() })}
                                                                 </p>
                                                             </button>
                                                         ))}
@@ -230,13 +232,13 @@ export default function AnalyticsPage() {
                     <Card className="rounded-2xl h-full flex flex-col shadow-sm border-gray-100">
                         <CardHeader className="bg-white z-10 border-b border-gray-50">
                             <CardTitle className="text-base flex items-center justify-between">
-                                <span>{activeView === 'analysis' && activeAnalysisTopic ? `✨ AI Analysis — ${activeAnalysisTopic}` : selectedConv ? `${selectedConv.agent_name} — ${selectedConv.user_name || 'Anonymous'}` : 'Pilih percakapan'}</span>
+                                <span>{activeView === 'analysis' && activeAnalysisTopic ? `✨ ${t('analytics.liveAnalysis')} — ${activeAnalysisTopic}` : selectedConv ? `${selectedConv.agent_name} — ${selectedConv.user_name || t('analytics.anonymous')}` : t('analytics.selectConversation')}</span>
                                 {selectedConv && (
                                     <div className="flex gap-2">
                                         <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${selectedConv.session_type === 'voice' ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-blue-50 text-blue-600 border border-blue-100'
                                             }`}>{selectedConv.session_type}</span>
                                         <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${selectedConv.is_complaint ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                                            }`}>{selectedConv.is_complaint ? 'Complaint' : selectedConv.status}</span>
+                                            }`}>{selectedConv.is_complaint ? t('analytics.complaint') : selectedConv.status}</span>
                                     </div>
                                 )}
                             </CardTitle>
@@ -254,16 +256,16 @@ export default function AnalyticsPage() {
                                                 <Sparkles className="w-5 h-5" />
                                             </div>
                                             <div>
-                                                <h3 className="font-bold text-gray-900">AI Live Analysis</h3>
-                                                <p className="text-xs text-gray-500">Topik: {activeAnalysisTopic.replace('__ai_custom__', 'Custom AI Topic')}</p>
+                                                <h3 className="font-bold text-gray-900">{t('analytics.liveAnalysis')}</h3>
+                                                <p className="text-xs text-gray-500">{t('analytics.topicLabel', { topic: activeAnalysisTopic.replace('__ai_custom__', 'Custom AI Topic') })}</p>
                                             </div>
                                         </div>
 
                                         {isAnalyzing ? (
                                             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                                                 <Loader2 className="w-10 h-10 animate-spin text-indigo-400 mb-4" />
-                                                <p className="text-sm font-medium">Sedang menganalisis percakapan...</p>
-                                                <p className="text-xs text-gray-400 mt-1">AI sedang membaca semua chat di topik ini</p>
+                                                <p className="text-sm font-medium">{t('analytics.analyzingDetailed')}</p>
+                                                <p className="text-xs text-gray-400 mt-1">{t('analytics.readingAllChats')}</p>
                                             </div>
                                         ) : analysis ? (
                                             <div className="space-y-5">
@@ -280,7 +282,7 @@ export default function AnalyticsPage() {
                                                                 analysis.sentiment === 'Negative' ? <ThumbsDown className="w-5 h-5" /> : <Minus className="w-5 h-5" />}
                                                         </div>
                                                         <div>
-                                                            <p className="text-lg font-bold text-gray-900">{analysis.sentiment} Sentiment</p>
+                                                            <p className="text-lg font-bold text-gray-900">{analysis.sentiment} {t('analytics.sentiment')}</p>
                                                             <p className="text-sm text-gray-600">{analysis.sentimentReason}</p>
                                                         </div>
                                                     </div>
@@ -290,8 +292,8 @@ export default function AnalyticsPage() {
                                                 {analysis.orders && analysis.orders.length > 0 && (
                                                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
                                                         <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-4">
-                                                            <Package className="w-4 h-4 text-indigo-500" /> Orders & Requests
-                                                            <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full ml-auto">{analysis.orders.length} ditemukan</span>
+                                                            <Package className="w-4 h-4 text-indigo-500" /> {t('analytics.ordersRequests')}
+                                                            <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full ml-auto">{t('analytics.foundCount', { count: analysis.orders.length.toString() })}</span>
                                                         </h4>
                                                         <div className="space-y-3">
                                                             {analysis.orders.map((o: any, i: number) => (
@@ -309,8 +311,8 @@ export default function AnalyticsPage() {
                                                 {analysis.structuredDataExtractor && analysis.structuredDataExtractor.length > 0 && (
                                                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
                                                         <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-4">
-                                                            <UserSquare2 className="w-4 h-4 text-emerald-500" /> Extracted Customer Data
-                                                            <span className="text-xs bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full ml-auto">{analysis.structuredDataExtractor.length} pelanggan</span>
+                                                            <UserSquare2 className="w-4 h-4 text-emerald-500" /> {t('analytics.extractedData')}
+                                                            <span className="text-xs bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full ml-auto">{t('analytics.customerCount', { count: analysis.structuredDataExtractor.length.toString() })}</span>
                                                         </h4>
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                             {analysis.structuredDataExtractor.map((d: any, i: number) => (
@@ -327,7 +329,7 @@ export default function AnalyticsPage() {
                                                 {/* Empty state if no data */}
                                                 {(!analysis.orders || analysis.orders.length === 0) && (!analysis.structuredDataExtractor || analysis.structuredDataExtractor.length === 0) && (
                                                     <div className="text-center py-6 text-gray-400">
-                                                        <p className="text-sm">Tidak ditemukan pesanan atau data pelanggan spesifik di percakapan ini.</p>
+                                                        <p className="text-sm">{t('analytics.noDataFound')}</p>
                                                     </div>
                                                 )}
                                             </div>
@@ -343,8 +345,8 @@ export default function AnalyticsPage() {
                                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                                     <div className="text-center">
                                         <MessageSquare className="w-10 h-10 mx-auto mb-3 text-gray-200 stroke-1" />
-                                        <p>Pilih percakapan di kolom kiri untuk melihat detail</p>
-                                        <p className="text-xs text-gray-300 mt-1">atau jalankan AI Analysis pada topik</p>
+                                        <p>{t('analytics.selectPlaceholder')}</p>
+                                        <p className="text-xs text-gray-300 mt-1">{t('analytics.orRunAnalysis')}</p>
                                     </div>
                                 </div>
                             ) : (

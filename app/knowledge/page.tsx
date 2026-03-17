@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Upload, FileText, ChevronRight, Plus, CheckCircle, Clock, Trash2, ArrowLeft, Loader2, BookOpen, Link as LinkIcon, Settings, Target, EyeOff, LayoutTemplate, Copy, MonitorSmartphone, Smartphone, Shield, Sparkles, Globe, Eye, Pencil, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function GeneralKnowledgePage() {
   const { admin } = useStore();
+  const { t } = useTranslation();
   const [sources, setSources] = useState<any[]>([]);
   const [urlInput, setUrlInput] = useState('');
   const [textInput, setTextInput] = useState('');
@@ -48,7 +50,7 @@ export default function GeneralKnowledgePage() {
           body: JSON.stringify({ type: 'file', name: file.name, content: base64, mimeType: file.type }),
         });
         if (res.ok) {
-          toast.success(`${file.name} berhasil di-upload`);
+          toast.success(t('knowledge.uploadSuccess', { name: file.name }));
           fetchSources();
         }
       };
@@ -64,17 +66,15 @@ export default function GeneralKnowledgePage() {
     // Check if this URL was already scraped
     const existing = sources.find((s: any) => s.name === urlInput || s.name?.includes(urlInput));
     if (existing) {
-      const confirmRescrape = window.confirm(
-        '⚠️ URL ini sudah pernah di-scrape sebelumnya.\n\nScraping ulang akan memakan token tambahan yang cukup besar.\n\nYakin ingin scrape ulang?'
-      );
+      const confirmRescrape = window.confirm(t('knowledge.scrapedConfirm'));
       if (!confirmRescrape) return;
     }
 
-    toast.warning('⚠️ Scraping website memakan token yang cukup besar (bisa 10.000+ token per halaman). Pastikan URL yang di-scrape benar-benar diperlukan.', { duration: 5000 });
+    toast.warning(t('knowledge.scrapingWarning'), { duration: 5000 });
 
     const { scrapeUrl } = useStore.getState();
     scrapeUrl(urlInput);
-    toast.info('🕷️ Crawling dimulai! Anda bisa meninggalkan halaman ini sambil menunggu. Notifikasi muncul saat selesai.', { duration: 6000 });
+    toast.info(t('knowledge.crawlingStarted'), { duration: 6000 });
     setUrlInput('');
   };
 
@@ -86,7 +86,7 @@ export default function GeneralKnowledgePage() {
       body: JSON.stringify({ type: 'text', name: textName || `Catatan ${new Date().toLocaleDateString('id-ID')}`, content: textInput }),
     });
     if (res.ok) {
-      toast.success('Teks berhasil ditambahkan');
+      toast.success(t('knowledge.textSuccess'));
       setTextInput('');
       setTextName('');
       fetchSources();
@@ -96,7 +96,7 @@ export default function GeneralKnowledgePage() {
   const handleDelete = async (id: string) => {
     await fetch(`/api/general-knowledge?id=${id}`, { method: 'DELETE' });
     setSources(prev => prev.filter(s => s.id !== id));
-    toast.success('Data knowledge dihapus');
+    toast.success(t('knowledge.deleteSuccess'));
   };
 
   if (loading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
@@ -105,8 +105,8 @@ export default function GeneralKnowledgePage() {
     <div className="space-y-8 max-w-5xl mx-auto">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 font-display">📚 Knowledge Base Umum</h1>
-        <p className="text-gray-500 mt-2">Data pengetahuan perusahaan yang digunakan oleh <strong>semua agent</strong> Anda.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900 font-display">📚 {t('knowledge.title')}</h1>
+        <p className="text-gray-500 mt-2">{t('knowledge.subtitle')}</p>
       </motion.div>
 
       {/* Info Banner */}
@@ -115,21 +115,17 @@ export default function GeneralKnowledgePage() {
           <div className="flex items-start gap-3">
             <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
             <div>
-              <p className="font-semibold text-blue-900 text-sm">Apa itu Knowledge Base Umum?</p>
-              <p className="text-sm text-blue-700 mt-1">
-                Data ini akan menjadi <strong>fondasi pengetahuan dasar</strong> untuk semua AI agent Anda.
-                Masukkan informasi lengkap tentang perusahaan: deskripsi bisnis, layanan, SOP, FAQ, kebijakan, dll.
-                Setiap agent akan otomatis membaca data ini + knowledge spesifik topiknya.
-              </p>
+              <p className="font-semibold text-blue-900 text-sm">{t('knowledge.bannerTitle')}</p>
+              <p className="text-sm text-blue-700 mt-1">{t('knowledge.bannerDesc')}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
-                  <FileText className="w-3 h-3" /> Upload File (PDF, DOCX, TXT)
+                  <FileText className="w-3 h-3" /> {t('knowledge.uploadFile')}
                 </span>
                 <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
-                  <Globe className="w-3 h-3" /> Tambah URL
+                  <Globe className="w-3 h-3" /> {t('knowledge.addUrl')}
                 </span>
                 <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> Tempel Tulisan
+                  <Sparkles className="w-3 h-3" /> {t('knowledge.pasteText')}
                 </span>
               </div>
             </div>
@@ -142,15 +138,15 @@ export default function GeneralKnowledgePage() {
         <div className="lg:col-span-2 space-y-6">
           <Card className="rounded-2xl">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><BookOpen className="w-5 h-5 text-blue-600" /> Tambah Data Knowledge</CardTitle>
+              <CardTitle className="flex items-center gap-2"><BookOpen className="w-5 h-5 text-blue-600" /> {t('knowledge.addKnowledgeTitle')}</CardTitle>
             </CardHeader>
             <CardContent>
               {/* Tabs */}
               <div className="flex space-x-1 mb-6 bg-gray-100 rounded-xl p-1">
                 {([
-                  { key: 'text' as const, label: '📝 Tempel Tulisan', icon: FileText },
-                  { key: 'files' as const, label: '📁 Upload File', icon: Upload },
-                  { key: 'urls' as const, label: '🔗 Tambah URL', icon: LinkIcon },
+                  { key: 'text' as const, label: `📝 ${t('knowledge.tabs.text')}`, icon: FileText },
+                  { key: 'files' as const, label: `📁 ${t('knowledge.tabs.files')}`, icon: Upload },
+                  { key: 'urls' as const, label: `🔗 ${t('knowledge.tabs.urls')}`, icon: LinkIcon },
                 ]).map(tab => (
                   <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                     className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === tab.key
@@ -166,20 +162,20 @@ export default function GeneralKnowledgePage() {
               {activeTab === 'text' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Judul / Label</label>
-                    <input type="text" placeholder="Contoh: Deskripsi Perusahaan, FAQ, Kebijakan"
+                    <label className="text-sm font-medium text-gray-700">{t('knowledge.textLabel')}</label>
+                    <input type="text" placeholder={t('knowledge.textPlaceholder')}
                       className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                       value={textName} onChange={(e) => setTextName(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Isi Knowledge</label>
-                    <textarea placeholder="Tempel informasi lengkap tentang perusahaan Anda di sini...&#10;&#10;Contoh:&#10;- Deskripsi bisnis dan layanan&#10;- SOP pelayanan&#10;- FAQ pelanggan&#10;- Kebijakan & prosedur&#10;- Informasi produk / fasilitas"
+                    <label className="text-sm font-medium text-gray-700">{t('knowledge.textContentLabel')}</label>
+                    <textarea placeholder={t('knowledge.textContentPlaceholder')}
                       className="w-full h-52 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                       value={textInput} onChange={(e) => setTextInput(e.target.value)} />
                   </div>
                   <Button onClick={handleAddText} disabled={!textInput.trim()}
                     className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-xl">
-                    <Plus className="h-4 w-4 mr-1" /> Simpan Teks
+                    <Plus className="h-4 w-4 mr-1" /> {t('knowledge.saveTextBtn')}
                   </Button>
                 </motion.div>
               )}
@@ -190,8 +186,8 @@ export default function GeneralKnowledgePage() {
                   <div {...getRootProps()} className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
                     <input {...getInputProps()} />
                     <Upload className="mx-auto h-8 w-8 text-blue-500 mb-3" />
-                    <p className="text-sm font-medium text-gray-900">Klik untuk upload atau drag and drop</p>
-                    <p className="text-xs text-gray-500 mt-1">PDF, DOCX, TXT, CSV (max 10MB)</p>
+                    <p className="text-sm font-medium text-gray-900">{t('knowledge.uploadTitle')}</p>
+                    <p className="text-xs text-gray-500 mt-1">{t('knowledge.uploadLimit')}</p>
                   </div>
                 </motion.div>
               )}
@@ -199,15 +195,15 @@ export default function GeneralKnowledgePage() {
               {/* URL Input */}
               {activeTab === 'urls' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                  <p className="text-sm text-gray-500">Masukkan URL website yang berisi informasi tentang bisnis Anda. AI akan membaca konten dari halaman tersebut.</p>
+                  <p className="text-sm text-gray-500">{t('knowledge.urlDesc')}</p>
                   <div className="flex gap-2">
-                    <input type="url" placeholder="https://website-perusahaan.com/tentang-kami"
+                    <input type="url" placeholder={t('knowledge.urlPlaceholder')}
                       className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                       value={urlInput} onChange={(e) => setUrlInput(e.target.value)} />
                     <Button onClick={handleAddUrl} disabled={!urlInput.trim() || isAddingUrl}
                       className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-xl">
                       {isAddingUrl ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
-                      {isAddingUrl ? 'Memproses...' : 'Tambah'}
+                      {isAddingUrl ? t('knowledge.urlProcessing') : t('knowledge.addBtn')}
                     </Button>
                   </div>
                 </motion.div>
@@ -221,16 +217,16 @@ export default function GeneralKnowledgePage() {
           <Card className="h-full rounded-2xl">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>Data Tersimpan</span>
-                <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{sources.length} sumber</span>
+                <span>{t('knowledge.savedData')}</span>
+                <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{t('knowledge.savedCount', { count: sources.length.toString() })}</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               {sources.length === 0 ? (
                 <div className="text-center py-8">
                   <BookOpen className="mx-auto h-10 w-10 text-gray-200 mb-3" />
-                  <p className="text-sm text-gray-500">Belum ada data knowledge.</p>
-                  <p className="text-xs text-gray-400 mt-1">Mulai dengan menambahkan informasi tentang bisnis Anda.</p>
+                  <p className="text-sm text-gray-500">{t('knowledge.noData')}</p>
+                  <p className="text-xs text-gray-400 mt-1">{t('knowledge.startAdding')}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -250,7 +246,7 @@ export default function GeneralKnowledgePage() {
                               : <FileText className="h-4 w-4 text-orange-500 flex-shrink-0" />}
                           <div className="overflow-hidden">
                             <span className="text-sm font-medium text-gray-700 truncate block">{source.name}</span>
-                            <span className="text-[10px] text-gray-400 uppercase">{source.type} • {source.content?.length || 0} chars</span>
+                            <span className="text-[10px] text-gray-400 uppercase">{source.type} • {source.content?.length || 0} {t('knowledge.chars')}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
@@ -311,7 +307,7 @@ export default function GeneralKnowledgePage() {
                       onClick={() => setIsEditing(true)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                     >
-                      <Pencil className="h-3.5 w-3.5" /> Edit
+                      <Pencil className="h-3.5 w-3.5" /> {t('knowledge.modal.edit')}
                     </button>
                   ) : (
                     <button
@@ -324,21 +320,21 @@ export default function GeneralKnowledgePage() {
                             body: JSON.stringify({ id: selectedSource.id, name: editName, content: editContent }),
                           });
                           if (res.ok) {
-                            toast.success('✅ Knowledge berhasil diperbarui!');
+                            toast.success(t('knowledge.modal.updated'));
                             setSelectedSource(null);
                             setIsEditing(false);
                             fetchSources();
                           } else {
-                            toast.error('Gagal menyimpan perubahan');
+                            toast.error(t('knowledge.modal.saveError'));
                           }
-                        } catch { toast.error('Gagal menyimpan'); }
+                        } catch { toast.error(t('common.error')); }
                         finally { setIsSaving(false); }
                       }}
                       disabled={isSaving}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-lg transition-all disabled:opacity-50"
                     >
                       {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                      Simpan
+                      {t('knowledge.modal.save')}
                     </button>
                   )}
                   <button onClick={() => { setSelectedSource(null); setIsEditing(false); }}
@@ -351,8 +347,8 @@ export default function GeneralKnowledgePage() {
               {/* Modal Meta */}
               <div className="px-5 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-4 text-xs text-gray-500">
                 <span className="uppercase font-medium bg-gray-200 text-gray-600 px-2 py-0.5 rounded">{selectedSource.type}</span>
-                <span>{selectedSource.content?.length?.toLocaleString() || 0} karakter</span>
-                {selectedSource.date_added && <span>Ditambahkan: {new Date(selectedSource.date_added).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
+                <span>{selectedSource.content?.length?.toLocaleString() || 0} {t('knowledge.chars')}</span>
+                {selectedSource.date_added && <span>{t('knowledge.modal.added')} {new Date(selectedSource.date_added).toLocaleDateString(t('common.localeCode') === 'id' ? 'id-ID' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
               </div>
 
               {/* Modal Content */}
@@ -365,7 +361,7 @@ export default function GeneralKnowledgePage() {
                   />
                 ) : (
                   <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap font-mono bg-gray-50 rounded-xl p-4 min-h-[200px]">
-                    {selectedSource.content || '(Konten kosong)'}
+                    {selectedSource.content || t('knowledge.modal.empty')}
                   </div>
                 )}
               </div>
