@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useStore, AgentConfig } from '@/lib/store';
-import { Bot, Plus, QrCode, Pencil, Trash2, Copy, ExternalLink, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Bot, Plus, QrCode, Pencil, Trash2, Copy, ExternalLink, ToggleLeft, ToggleRight, Code } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
@@ -70,6 +70,11 @@ export default function AgentsPage() {
     const copyLink = (id: string) => {
         navigator.clipboard.writeText(`${appUrl}/bot/${id}`);
         toast.success(t('agents.linkCopied'));
+    };
+
+    const copyEmbed = (id: string) => {
+        navigator.clipboard.writeText(`${appUrl}/bot/${id}`);
+        toast.success('Link bot berhasil disalin!');
     };
 
     const handleBackFromForm = () => {
@@ -214,8 +219,9 @@ export default function AgentsPage() {
                                     {t('common.edit')}
                                 </button>
                                 <button
-                                    onClick={() => copyLink(agent.id)}
+                                    onClick={() => copyEmbed(agent.id)}
                                     className="flex items-center justify-center gap-1.5 text-sm font-medium text-gray-700 hover:text-blue-600 py-2 px-3 rounded-lg hover:bg-blue-50 transition-colors"
+                                    title="Salin Link Bot"
                                 >
                                     <Copy className="w-3.5 h-3.5" />
                                 </button>

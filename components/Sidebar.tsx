@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, BookOpen, Bot, BarChart3, Settings, LogOut, AlertTriangle, QrCode } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Bot, BarChart3, Settings, LogOut, AlertTriangle, HelpCircle } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
@@ -13,6 +13,7 @@ const navigation = [
   { id: 'knowledgeBase', href: '/knowledge', icon: BookOpen },
   { id: 'analytics', href: '/analytics', icon: BarChart3 },
   { id: 'complaints', href: '/complaints', icon: AlertTriangle },
+  { id: 'knowledgeGaps', href: '/unanswered', icon: HelpCircle },
   { id: 'settings', href: '/settings', icon: Settings },
 ];
 

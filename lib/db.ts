@@ -176,6 +176,59 @@ async function initializeDatabase() {
       )
     `);
 
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS response_cache (
+        id VARCHAR(255) PRIMARY KEY,
+        agent_id VARCHAR(255) NOT NULL,
+        question_hash VARCHAR(255) NOT NULL,
+        question TEXT,
+        response LONGTEXT,
+        hit_count INT DEFAULT 0,
+        created_at DATETIME DEFAULT NOW(),
+        UNIQUE KEY unique_agent_hash (agent_id, question_hash),
+        FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+      )
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS unanswered_queries (
+        id VARCHAR(255) PRIMARY KEY,
+        admin_id VARCHAR(255) NOT NULL,
+        agent_id VARCHAR(255) NOT NULL,
+        question TEXT NOT NULL,
+        status VARCHAR(50) DEFAULT 'open',
+        created_at DATETIME DEFAULT NOW(),
+        FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE,
+        FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+      )
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS token_logs (
+        id VARCHAR(255) PRIMARY KEY,
+        admin_id VARCHAR(255) NOT NULL,
+        agent_id VARCHAR(255),
+        source VARCHAR(50) DEFAULT 'chat',
+        action VARCHAR(100) DEFAULT '',
+        tokens_used INT DEFAULT 0,
+        from_cache TINYINT DEFAULT 0,
+        created_at DATETIME DEFAULT NOW(),
+        FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
+      )
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS conversation_ratings (
+        id VARCHAR(255) PRIMARY KEY,
+        conversation_id VARCHAR(255),
+        agent_id VARCHAR(255) NOT NULL,
+        rating INT NOT NULL,
+        feedback TEXT,
+        created_at DATETIME DEFAULT NOW(),
+        FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+      )
+    `);
+
     // Seed default admin accounts
     const bcrypt = await import('bcryptjs');
     const admins = [

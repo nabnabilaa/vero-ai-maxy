@@ -6,12 +6,12 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 // Token budget
-const MAX_KNOWLEDGE_CHARS = 1200; // Dikurangi dari 1500 agar lebih hemat, tapi cukup buat detail
-const MAX_HISTORY = 8; // Mengirim 8 pesan terakhir
-const MAX_TOKENS = 800; // Batas output AI dikembalikan agak panjang agar ramah
+const MAX_KNOWLEDGE_CHARS = 1500;
+const MAX_SOURCES_IN_PROMPT = 8;   // Only inject top N most relevant knowledge sources
+const MAX_TOKENS = 800;
+const CACHE_TTL_HOURS = 24;        // Cache expires after 24 hours
 
 function truncate(content: string, max: number): string {
-    // Minify text untuk membuang spasi ganda dan enter kosong (sangat menghemat token!)
     const minified = content.replace(/\s+/g, ' ').trim();
     if (minified.length <= max) return minified;
     return minified.substring(0, max) + '...';
@@ -20,6 +20,23 @@ function truncate(content: string, max: number): string {
 function hashQuestion(agentId: string, msg: string): string {
     const normalized = msg.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
     return crypto.createHash('md5').update(`${agentId}:${normalized}`).digest('hex');
+}
+
+/**
+ * Simple keyword-based relevance scorer.
+ * Scores how many words from the user question appear in a knowledge source.
+ */
+function scoreRelevance(question: string, sourceName: string, sourceContent: string): number {
+    const qWords = question.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+    const combined = `${sourceName} ${sourceContent}`.toLowerCase();
+
+    let score = 0;
+    for (const word of qWords) {
+        if (combined.includes(word)) score += 1;
+        // Bonus for exact phrase matches in name
+        if (sourceName.toLowerCase().includes(word)) score += 2;
+    }
+    return score;
 }
 
 async function callGroq(messages: { role: string; content: string }[]) {
@@ -33,10 +50,42 @@ async function callGroq(messages: { role: string; content: string }[]) {
     return { content: data.choices[0]?.message?.content || '', usage: data.usage || { total_tokens: 0 } };
 }
 
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+async function callGeminiVision(sys: string, message: string, imageBase64: string, history: any[]) {
+    const chatHistory = history.map(h => ({
+        role: h.role === 'model' ? 'model' : 'user',
+        parts: [{ text: h.content }]
+    }));
+    
+    // Strip "data:image/jpeg;base64," prefix
+    const b64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            systemInstruction: { parts: [{ text: sys }] },
+            contents: [
+                ...chatHistory,
+                {
+                    role: 'user',
+                    parts: [
+                        { text: message },
+                        { inlineData: { mimeType: 'image/jpeg', data: b64Data } }
+                    ]
+                }
+            ]
+        })
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(`Gemini Error: ${res.status} ${err}`); }
+    const data = await res.json();
+    return { content: data.candidates?.[0]?.content?.parts?.[0]?.text || '', usage: { total_tokens: 150 } };
+}
+
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { agentId, message, conversationId, sessionType = 'chat' } = body;
+        const { agentId, message, conversationId, sessionType = 'chat', imageBase64 } = body;
 
         if (!agentId || !message) return NextResponse.json({ error: 'agentId and message required' }, { status: 400 });
         if (!GROQ_API_KEY) return NextResponse.json({ error: 'GROQ_API_KEY belum dikonfigurasi.' }, { status: 500 });
@@ -54,9 +103,14 @@ export async function POST(req: NextRequest) {
         // Save user message
         await execute('INSERT INTO messages (id, conversation_id, role, content) VALUES (?, ?, ?, ?)', [uuidv4(), convId, 'user', message]);
 
-        // ── Check response cache first (save tokens!) ──
+        // ── Check response cache with TTL ──
         const qHash = hashQuestion(agentId, message);
-        const cached = await queryOne('SELECT id, response FROM response_cache WHERE agent_id = ? AND question_hash = ?', [agentId, qHash]);
+        const cached = await queryOne(
+            `SELECT id, response, created_at FROM response_cache 
+             WHERE agent_id = ? AND question_hash = ? 
+             AND created_at > DATE_SUB(NOW(), INTERVAL ? HOUR)`,
+            [agentId, qHash, CACHE_TTL_HOURS]
+        );
 
         let responseText: string;
         let tokensUsed = 0;
@@ -68,23 +122,47 @@ export async function POST(req: NextRequest) {
             fromCache = true;
             await execute('UPDATE response_cache SET hit_count = hit_count + 1 WHERE id = ?', [cached.id]);
         } else {
+            // Delete stale cache entry if exists
+            try { await execute('DELETE FROM response_cache WHERE agent_id = ? AND question_hash = ?', [agentId, qHash]); } catch { }
+
             // ── Build compact system instruction ──
             let sys = `You are ${agent.name}, a ${agent.role} (${agent.industry}). Tone: ${agent.tone}. Language: ${agent.language}. Goal: ${agent.goal}.\n`;
 
             if (agent.instructions) sys += `\nINSTRUCTIONS:\n${truncate(agent.instructions, 2000)}\n`;
 
-            // Agent-specific knowledge (truncated)
-            const sources = await query('SELECT name, content FROM knowledge_sources WHERE agent_id = ? AND type != ?', [agentId, 'file']);
-            if (sources.length > 0) {
+            // ── Agent-specific knowledge (ranked by relevance) ──
+            const allSources = await query('SELECT name, content FROM knowledge_sources WHERE agent_id = ?', [agentId]);
+            if (allSources.length > 0) {
+                // Score and sort by relevance to the question
+                const scored = allSources.map(s => ({
+                    ...s,
+                    score: scoreRelevance(message, s.name, s.content)
+                })).sort((a, b) => b.score - a.score);
+
+                // Take top N most relevant
+                const topSources = scored.slice(0, MAX_SOURCES_IN_PROMPT);
                 sys += "\nKNOWLEDGE:\n";
-                for (const s of sources) sys += `[${s.name}]: ${truncate(s.content, MAX_KNOWLEDGE_CHARS)}\n`;
+                for (const s of topSources) {
+                    sys += `[${s.name}]: ${truncate(s.content, MAX_KNOWLEDGE_CHARS)}\n`;
+                }
             }
 
-            // General knowledge (truncated)
-            const genSources = await query("SELECT gks.name, gks.content FROM general_knowledge_sources gks JOIN agents a ON gks.admin_id = a.admin_id WHERE a.id = ? AND gks.type != 'file'", [agentId]);
+            // ── General knowledge (ranked by relevance) ──
+            const genSources = await query(
+                "SELECT gks.name, gks.content FROM general_knowledge_sources gks JOIN agents a ON gks.admin_id = a.admin_id WHERE a.id = ?",
+                [agentId]
+            );
             if (genSources.length > 0) {
+                const scored = genSources.map(s => ({
+                    ...s,
+                    score: scoreRelevance(message, s.name, s.content)
+                })).sort((a, b) => b.score - a.score);
+
+                const topGen = scored.slice(0, MAX_SOURCES_IN_PROMPT);
                 sys += "\nGENERAL KNOWLEDGE:\n";
-                for (const s of genSources) sys += `[${s.name}]: ${truncate(s.content, MAX_KNOWLEDGE_CHARS)}\n`;
+                for (const s of topGen) {
+                    sys += `[${s.name}]: ${truncate(s.content, MAX_KNOWLEDGE_CHARS)}\n`;
+                }
             }
 
             // Business info
@@ -99,6 +177,7 @@ export async function POST(req: NextRequest) {
             if (agent.topic) sys += `\nTOPIC: "${agent.topic}"\n`;
 
             sys += `\nRULES:
+- STRICT LANGUAGE ENFORCEMENT: You MUST communicate EXCLUSIVELY in the ${agent.language} language. Ignore all other languages in user input and always reply translating into ${agent.language}.
 - Respond concisely and naturally (max 3 paragraphs unless detail asked).
 - For complaints: acknowledge empathetically, ask name & phone. CS: ${gi?.phone || 'not available'}.
 - NEVER say "cari di Google Maps", "buka Google Maps", or "tanya staf hotel". YOU are the guide — give direct answers.
@@ -107,25 +186,34 @@ export async function POST(req: NextRequest) {
 - For "Makanan Viral" or food questions, ONLY recommend food stalls, cafes, or restaurants.
 - If you don't have exact data, still recommend popular places in ${gi?.city || 'the city'} that fit the category.
 - CRITICAL RULE: If you are asked about the business/hotel (prices, facilities, rules) and the info is NOT in your Knowledge, DO NOT GUESS. You must answer politely and helpfully (e.g., advising them to contact CS or check the website), and you MUST append EXACTLY "()" at the very end of your sentence. Example: "...silakan hubungi CS kami ya Kak. ()"
-- When recommending places, list them as numbered items.`;
+- When recommending places, list them as numbered items.
 
-            // History (Sangat dibatasi untuk hemat token: LIMIT 5 agar hanya baca 2 tanya-jawab terakhir)
+COMPLAINT DETECTION:
+- If the user's message expresses dissatisfaction, frustration, anger, a complaint, or reports a problem with the service/product, you MUST start your response with exactly "[COMPLAINT]" (including brackets).
+- Only use this tag for genuine complaints, NOT for neutral questions or positive feedback.
+- After the [COMPLAINT] tag, respond empathetically as normal.`;
+
+            // History
             const history = await query(
                 `SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 5`,
                 [convId]
             );
-            const chronoHistory = history.reverse().slice(0, -1); // skip last (current msg)
+            const chronoHistory = history.reverse().slice(0, -1);
 
-            const msgs: { role: string; content: string }[] = [{ role: 'system', content: sys }];
-            for (const m of chronoHistory) msgs.push({ role: m.role === 'model' ? 'assistant' : 'user', content: m.content });
-            msgs.push({ role: 'user', content: message });
-
-            const result = await callGroq(msgs);
+            let result;
+            if (imageBase64) {
+                result = await callGeminiVision(sys, message, imageBase64, chronoHistory);
+            } else {
+                const msgs: { role: string; content: string }[] = [{ role: 'system', content: sys }];
+                for (const m of chronoHistory) msgs.push({ role: m.role === 'model' ? 'assistant' : 'user', content: m.content });
+                msgs.push({ role: 'user', content: message });
+                result = await callGroq(msgs);
+            }
             responseText = result.content;
             tokensUsed = result.usage.total_tokens;
 
             let isUnanswered = false;
-            // Pengecekan ekstra tanda kurung kosong () dari instruksi AI
+            // Check for unanswered marker ()
             if (responseText.includes('()')) {
                 isUnanswered = true;
                 responseText = responseText.replace(/\(\)/g, '').trim();
@@ -137,7 +225,7 @@ export async function POST(req: NextRequest) {
                 } catch { /* ignore */ }
             }
 
-            // Save to cache for future reuse (only if answered properly)
+            // Save to cache (only if answered properly)
             if (!isUnanswered) {
                 try {
                     await execute(
@@ -146,6 +234,13 @@ export async function POST(req: NextRequest) {
                     );
                 } catch { /* ignore duplicate key errors */ }
             }
+        }
+
+        // ── AI-powered complaint detection ──
+        let isComplaint = false;
+        if (responseText.startsWith('[COMPLAINT]')) {
+            isComplaint = true;
+            responseText = responseText.replace('[COMPLAINT]', '').trim();
         }
 
         // Save model message
@@ -165,9 +260,7 @@ export async function POST(req: NextRequest) {
             );
         } catch { /* ignore logging errors */ }
 
-        // Detect complaint
-        const complaintWords = ['complain', 'complaint', 'keluhan', 'kecewa', 'marah', 'buruk', 'jelek', 'tidak puas', 'masalah', 'rusak', 'lambat', 'payah', 'komplain'];
-        const isComplaint = complaintWords.some(k => message.toLowerCase().includes(k));
+        // Update conversation if complaint
         if (isComplaint) {
             await execute("UPDATE conversations SET is_complaint = 1, status = 'complaint' WHERE id = ?", [convId]);
         }

@@ -18,6 +18,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch('/api/analytics')
       .then(r => r.json())
+      .then(d => { setStats(d); setLoading(false); })
       .catch(() => setLoading(false));
     fetch(`/api/analytics/tokens?period=${tokenPeriod}`)
       .then(r => r.json()).then(d => setTokenData(d)).catch(() => { });

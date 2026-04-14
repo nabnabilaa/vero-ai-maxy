@@ -6,7 +6,7 @@ import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 // AI generation now handled via /api/ai/generate server endpoint (Groq)
-import { Sparkles, Save, Loader2, ArrowLeft, Lightbulb, Wand2, ChevronDown, MapPin, BookOpen, Plus, X, CheckCircle, Upload, FileText, Search, Map, ExternalLink, Trash2 } from 'lucide-react';
+import { Sparkles, Save, Loader2, ArrowLeft, Lightbulb, Wand2, ChevronDown, MapPin, BookOpen, Plus, X, CheckCircle, Upload, FileText, Search, Map, ExternalLink, Trash2, Globe, Link as LinkIcon } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -228,6 +228,14 @@ export default function AgentForm({ editId, onBack }: { editId?: string | null; 
   const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
   const [showMap, setShowMap] = useState<string | null>(null); // field key that has map open
 
+  // Multi-source knowledge input state (Step 2)
+  const [topicSources, setTopicSources] = useState<any[]>([]);
+  const [knowledgeTab, setKnowledgeTab] = useState<'text' | 'files' | 'urls'>('text');
+  const [topicTextName, setTopicTextName] = useState('');
+  const [topicTextContent, setTopicTextContent] = useState('');
+  const [topicUrlInput, setTopicUrlInput] = useState('');
+  const [isAddingUrl, setIsAddingUrl] = useState(false);
+
   // Dropzone for topic knowledge files
   const onDropTopicFile = useCallback((acceptedFiles: File[]) => {
     acceptedFiles.forEach((file) => {
@@ -282,10 +290,19 @@ export default function AgentForm({ editId, onBack }: { editId?: string | null; 
           setAgentConfig(agent);
           fetch(`/api/knowledge?agentId=${editId}`).then(r => r.json()).then(kData => {
             const existingData: Record<string, string> = {};
+            const existingSources: any[] = [];
             (kData.sources || []).forEach((s: any) => {
-              if (s.type === 'text') existingData[s.name] = s.content;
+              // Field-based text knowledge → goes into knowledgeData form fields
+              if (s.type === 'text' && !s.name.startsWith('__manual__')) {
+                existingData[s.name] = s.content;
+              }
+              // File, URL, or manual text sources → goes into topicSources list
+              if (s.type === 'file' || s.type === 'url' || s.name.startsWith('__manual__')) {
+                existingSources.push(s);
+              }
             });
             setKnowledgeData(existingData);
+            setTopicSources(existingSources);
 
             // Rehydrate custom AI fields if we are editing an AI topic
             if (agent.topic === '__ai_custom__') {
@@ -482,9 +499,9 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
 
       // Save knowledge data as text sources
       if (agentId) {
-        // Delete old text sources for this agent (to refresh)
+        // Delete old FIELD-BASED text sources (not manual ones) to refresh
         const existing = await fetch(`/api/knowledge?agentId=${agentId}`).then(r => r.json());
-        for (const source of (existing.sources || []).filter((s: any) => s.type === 'text')) {
+        for (const source of (existing.sources || []).filter((s: any) => s.type === 'text' && !s.name.startsWith('__manual__'))) {
           await fetch(`/api/knowledge?id=${source.id}`, { method: 'DELETE' });
         }
 
@@ -499,12 +516,21 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
           }
         }
 
-        // Save uploaded topic files
+        // For new agents: save pending topic files that haven't been saved yet
         for (const file of topicFiles) {
           await fetch('/api/knowledge', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ agentId, type: 'file', name: file.name, content: file.content, mimeType: file.mimeType }),
+          });
+        }
+
+        // For new agents: save pending additional sources (text/url added via tabs)
+        for (const source of topicSources.filter(s => !s.id)) {
+          await fetch('/api/knowledge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agentId, type: source.type, name: source.name, content: source.content, mimeType: source.mime_type || 'text/plain' }),
           });
         }
       }
@@ -665,175 +691,201 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
             </CardContent>
           </Card>
 
-          {/* Topic hint */}
-          <Card className="rounded-2xl border-amber-100 bg-amber-50/50">
-            <CardContent className="p-5">
-              <div className="flex items-start gap-3">
-                <Lightbulb className="w-5 h-5 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-amber-900 text-sm">{t('agents.form.topicKnowledgeTitle', { topic: selectedTopic?.label || customTopicLabel })}</p>
-                  <p className="text-sm text-amber-700 mt-1">{t('agents.form.topicKnowledgeDesc')}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Field-based knowledge input */}
-          <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-blue-600" />
-                {t('agents.form.dataKnowledge')}: {selectedTopic?.label || customTopicLabel}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {selectedTopicFields.map((field) => (
-                <div key={field.key} className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    {field.label}
-                    {knowledgeData[field.key]?.trim() && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
-                  </label>
-
-                  {/* Google Maps scraping button for map-enabled fields */}
-                  {field.mapCategory && (
-                    <div className="flex gap-2 mb-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSearchPlaces(field.key, field.mapCategory!)}
-                        disabled={isSearchingPlaces}
-                        className="rounded-xl text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
-                      >
-                        {isSearchingPlaces && showMap === field.key ? (
-                          <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> {t('agents.form.searching')}</>
-                        ) : (
-                          <><Search className="w-3 h-3 mr-1.5" /> 🗺️ {t('agents.form.searchMaps')}</>
-                        )}
-                      </Button>
-                      {mapPlaces.length > 0 && showMap === field.key && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowMap(showMap === field.key ? null : field.key)}
-                          className="rounded-xl text-xs"
-                        >
-                          <Map className="w-3 h-3 mr-1.5" /> {showMap === field.key ? t('agents.form.hideMap') : t('agents.form.showMap')}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-
-                  {field.type === 'textarea' ? (
-                    <textarea
-                      className="w-full h-40 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all"
-                      placeholder={field.placeholder}
-                      value={knowledgeData[field.key] || ''}
-                      onChange={(e) => setKnowledgeData(prev => ({ ...prev, [field.key]: e.target.value }))}
-                    />
-                  ) : field.type === 'url' ? (
-                    <input
-                      type="url"
-                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all"
-                      placeholder={field.placeholder}
-                      value={knowledgeData[field.key] || ''}
-                      onChange={(e) => setKnowledgeData(prev => ({ ...prev, [field.key]: e.target.value }))}
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all"
-                      placeholder={field.placeholder}
-                      value={knowledgeData[field.key] || ''}
-                      onChange={(e) => setKnowledgeData(prev => ({ ...prev, [field.key]: e.target.value }))}
-                    />
-                  )}
-
-                  {/* Interactive Map Display */}
-                  {field.mapCategory && showMap === field.key && mapCoords && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-3">
-                      {/* OpenStreetMap Embed */}
-                      <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-                        <iframe
-                          src={`https://www.openstreetmap.org/export/embed.html?bbox=${mapCoords.lon - 0.015},${mapCoords.lat - 0.01},${mapCoords.lon + 0.015},${mapCoords.lat + 0.01}&layer=mapnik&marker=${mapCoords.lat},${mapCoords.lon}`}
-                          width="100%"
-                          height="300"
-                          style={{ border: 0 }}
-                          allowFullScreen
-                          loading="lazy"
-                        />
-                      </div>
-
-                      {/* Places List */}
-                      {mapPlaces.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('agents.form.placesNearby', { count: mapPlaces.length.toString() })}
-                          </p>
-                          <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
-                            {mapPlaces.map((place, i) => (
-                              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 hover:bg-blue-50 transition-colors group">
-                                <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                                  {i + 1}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-900 truncate">{place.name}</p>
-                                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-0.5">
-                                    <span>{place.distance_km < 1 ? `${Math.round(place.distance_km * 1000)}m` : `${place.distance_km}km`}</span>
-                                    {place.cuisine && <span>• {place.cuisine}</span>}
-                                    {place.opening_hours && <span>• {place.opening_hours}</span>}
-                                  </div>
-                                </div>
-                                <a href={place.maps_url} target="_blank" rel="noopener noreferrer"
-                                  className="text-gray-300 hover:text-blue-600 transition-colors shrink-0">
-                                  <ExternalLink className="w-4 h-4" />
-                                </a>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* File Upload for Topic Knowledge */}
-          <Card className="rounded-2xl">
+          {/* ── Multi-Source Knowledge Input (Text / File / URL) ── */}
+          <Card className="rounded-2xl border-indigo-100">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Upload className="w-5 h-5 text-indigo-600" />
-                {t('agents.form.uploadAdditional')}
+                <Plus className="w-5 h-5 text-indigo-600" />
+                {t('agents.form.addSourceTitle')}
               </CardTitle>
+              <p className="text-sm text-gray-500 mt-1">{t('agents.form.addSourceDesc')}</p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-500">{t('agents.form.uploadDesc')}</p>
-              <div {...getTopicDropProps()} className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${isTopicDragActive ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                <input {...getTopicInputProps()} />
-                <Upload className="mx-auto h-10 w-10 text-gray-400 mb-3" />
-                <p className="text-sm font-medium text-gray-900">{t('agents.form.uploadTitle')}</p>
-                <p className="text-xs text-gray-500 mt-1">{t('agents.form.uploadLimit')}</p>
+              {/* Tabs */}
+              <div className="flex space-x-1 bg-gray-100 rounded-xl p-1">
+                {([
+                  { key: 'text' as const, label: `📝 ${t('agents.form.tabText')}` },
+                  { key: 'files' as const, label: `📁 ${t('agents.form.tabFile')}` },
+                  { key: 'urls' as const, label: `🔗 ${t('agents.form.tabUrl')}` },
+                ] as const).map(tab => (
+                  <button key={tab.key} onClick={() => setKnowledgeTab(tab.key)}
+                    className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${knowledgeTab === tab.key
+                      ? 'bg-white text-indigo-700 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                      }`}>
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
-              {topicFiles.length > 0 && (
+              {/* Tab: Paste Text */}
+              {knowledgeTab === 'text' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">{t('agents.form.manualTextLabel')}</label>
+                    <input type="text" placeholder={t('agents.form.manualTextPlaceholder')}
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/50"
+                      value={topicTextName} onChange={(e) => setTopicTextName(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">{t('agents.form.manualContentLabel')}</label>
+                    <textarea placeholder={t('agents.form.manualContentPlaceholder')}
+                      className="w-full h-40 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/50"
+                      value={topicTextContent} onChange={(e) => setTopicTextContent(e.target.value)} />
+                  </div>
+                  <Button onClick={() => {
+                    if (!topicTextContent.trim()) return;
+                    const name = topicTextName.trim() || `__manual__Catatan ${new Date().toLocaleDateString('id-ID')}`;
+                    const prefixedName = name.startsWith('__manual__') ? name : `__manual__${name}`;
+                    if (editId) {
+                      // Save directly via API for existing agents
+                      fetch('/api/knowledge', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ agentId: editId, type: 'text', name: prefixedName, content: topicTextContent }),
+                      }).then(r => r.json()).then(data => {
+                        if (data.success) {
+                          setTopicSources(prev => [...prev, { id: data.id, type: 'text', name: prefixedName, content: topicTextContent }]);
+                          toast.success(t('agents.form.sourceAdded'));
+                        }
+                      });
+                    } else {
+                      // Queue for save later (new agent)
+                      setTopicSources(prev => [...prev, { type: 'text', name: prefixedName, content: topicTextContent }]);
+                      toast.success(t('agents.form.sourceAdded'));
+                    }
+                    setTopicTextName('');
+                    setTopicTextContent('');
+                  }} disabled={!topicTextContent.trim()}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 rounded-xl">
+                    <Plus className="h-4 w-4 mr-1" /> {t('agents.form.addTextBtn')}
+                  </Button>
+                </motion.div>
+              )}
+
+              {/* Tab: File Upload */}
+              {knowledgeTab === 'files' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+                  <div {...getTopicDropProps()} className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${isTopicDragActive ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <input {...getTopicInputProps()} />
+                    <Upload className="mx-auto h-8 w-8 text-indigo-500 mb-3" />
+                    <p className="text-sm font-medium text-gray-900">{t('agents.form.uploadTitle')}</p>
+                    <p className="text-xs text-gray-500 mt-1">{t('agents.form.uploadLimit')}</p>
+                  </div>
+                  {topicFiles.length > 0 && (
+                    <div className="space-y-2">
+                      {topicFiles.map((file, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-indigo-500" />
+                            <span className="text-sm font-medium text-gray-700">{file.name}</span>
+                          </div>
+                          <button onClick={() => setTopicFiles(prev => prev.filter((_, idx) => idx !== i))}
+                            className="text-gray-400 hover:text-red-500 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Tab: URL Scraping */}
+              {knowledgeTab === 'urls' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+                  <p className="text-sm text-gray-500">{t('agents.form.urlScrapeDesc')}</p>
+                  <div className="flex gap-2">
+                    <input type="url" placeholder={t('agents.form.urlPlaceholder')}
+                      className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/50"
+                      value={topicUrlInput} onChange={(e) => setTopicUrlInput(e.target.value)} />
+                    <Button onClick={async () => {
+                      if (!topicUrlInput.trim()) return;
+                      setIsAddingUrl(true);
+                      const loadingToast = toast.loading(t('agents.form.urlScraping'));
+                      try {
+                        if (editId) {
+                          // Save directly via API for existing agents
+                          const res = await fetch('/api/knowledge', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ agentId: editId, type: 'url', name: topicUrlInput, content: topicUrlInput }),
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            setTopicSources(prev => [...prev, { id: data.id, type: 'url', name: data.name || topicUrlInput, content: topicUrlInput }]);
+                            toast.success(t('agents.form.urlScraped'), { id: loadingToast });
+                          } else {
+                            toast.error(data.error || t('agents.form.urlScrapeError'), { id: loadingToast });
+                          }
+                        } else {
+                          // For new agents, scrape via general-knowledge to get content, then queue
+                          toast.info(t('agents.form.urlQueued'), { id: loadingToast });
+                          setTopicSources(prev => [...prev, { type: 'url', name: topicUrlInput, content: topicUrlInput }]);
+                        }
+                      } catch (err: any) {
+                        toast.error(err.message || t('agents.form.urlScrapeError'), { id: loadingToast });
+                      } finally {
+                        setIsAddingUrl(false);
+                        setTopicUrlInput('');
+                      }
+                    }} disabled={!topicUrlInput.trim() || isAddingUrl}
+                      className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 rounded-xl">
+                      {isAddingUrl ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+                      {isAddingUrl ? t('agents.form.urlProcessing') : t('agents.form.addUrlBtn')}
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Saved Sources List ── */}
+          {topicSources.length > 0 && (
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between text-base">
+                  <span className="flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-emerald-600" />
+                    {t('agents.form.savedSourcesTitle')}
+                  </span>
+                  <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                    {topicSources.length} {t('agents.form.savedSourcesCount')}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-2">
-                  {topicFiles.map((file, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-indigo-500" />
-                        <span className="text-sm font-medium text-gray-700">{file.name}</span>
+                  {topicSources.map((source, i) => (
+                    <div key={source.id || i} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:shadow-sm transition-all group">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        {source.type === 'url' ? <LinkIcon className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                          : source.type === 'file' ? <FileText className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                          : <FileText className="h-4 w-4 text-emerald-500 flex-shrink-0" />}
+                        <div className="overflow-hidden">
+                          <span className="text-sm font-medium text-gray-700 truncate block">
+                            {source.name?.replace(/^__manual__/, '')}
+                          </span>
+                          <span className="text-[10px] text-gray-400 uppercase">
+                            {source.type} {source.content?.length ? `• ${source.content.length.toLocaleString()} chars` : ''}
+                          </span>
+                        </div>
                       </div>
-                      <button onClick={() => setTopicFiles(prev => prev.filter((_, idx) => idx !== i))}
-                        className="text-gray-400 hover:text-red-500">
-                        <Trash2 className="w-4 h-4" />
+                      <button onClick={async () => {
+                        if (source.id) {
+                          await fetch(`/api/knowledge?id=${source.id}`, { method: 'DELETE' });
+                        }
+                        setTopicSources(prev => prev.filter((_, idx) => idx !== i));
+                        toast.success(t('agents.form.sourceDeleted'));
+                      }} className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1">
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex gap-3 justify-end">
             {editId ? (

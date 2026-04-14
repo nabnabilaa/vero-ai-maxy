@@ -358,7 +358,7 @@ export default function AnalyticsPage() {
                                         </div>
                                         <div className={`max-w-[75%] px-5 py-3.5 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-sm shadow-sm' : 'bg-white border border-gray-100 shadow-sm text-gray-800 rounded-2xl rounded-tl-sm'
                                             }`}>
-                                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                                            <p className="whitespace-pre-wrap break-words [word-break:break-word]">{msg.content}</p>
                                             <div className={`text-[10px] mt-2 flex items-center justify-end gap-1 ${msg.role === 'user' ? 'text-indigo-200' : 'text-gray-400'}`}>
                                                 {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 {msg.tokens_used > 0 && ` • ${msg.tokens_used} tokens`}
