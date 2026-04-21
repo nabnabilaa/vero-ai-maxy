@@ -30,8 +30,16 @@ export default function GeneralKnowledgePage() {
 
   const fetchSources = () => {
     fetch('/api/general-knowledge')
-      .then(r => r.json())
-      .then(data => { if (data.sources) setSources(data.sources); setLoading(false); })
+      .then(async (r) => {
+        if (r.status === 401) {
+          useStore.getState().logout();
+          window.location.href = '/';
+          return;
+        }
+        const data = await r.json();
+        if (data.sources) setSources(data.sources);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   };
 
@@ -70,11 +78,11 @@ export default function GeneralKnowledgePage() {
       if (!confirmRescrape) return;
     }
 
-    toast.warning(t('knowledge.scrapingWarning'), { duration: 5000 });
+    toast.warning(t('knowledge.urlScrapeWarning'), { duration: 5000 });
 
     const { scrapeUrl } = useStore.getState();
     scrapeUrl(urlInput);
-    toast.info(t('knowledge.crawlingStarted'), { duration: 6000 });
+    toast.info(t('knowledge.crawlStarted'), { duration: 6000 });
     setUrlInput('');
   };
 
