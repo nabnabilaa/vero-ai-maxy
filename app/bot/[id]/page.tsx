@@ -708,7 +708,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
       const lowerRt = rt.toLowerCase();
       const isWebsite = lowerRt.includes('website') || lowerRt.includes('situs web') || lowerRt.includes('selengkapnya') || lowerRt.includes('kunjungi');
       const isCS = lowerRt.includes('customer service') || lowerRt.includes('admin') || lowerRt.includes('bantuan') || lowerRt.includes(' cs ') || lowerRt.includes('hubung') || lowerRt.includes('contact');
-      const isEn = userLang.toLowerCase() === 'english';
+      const isEn = userLang.toLowerCase() !== 'indonesian';
       
       let showWebsite = false;
       let websiteLink = '';
@@ -754,12 +754,12 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
     callRef.current = false; setCallActive(false); setSpeaking(false); setListening(false); setConnecting(false);
     stopSpeaking();
     if (recRef.current) { try { recRef.current.abort(); } catch { } recRef.current = null; }
-    const isEng = userLang.toLowerCase() === 'english';
+    const isEng = userLang.toLowerCase() !== 'indonesian';
     setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: isEng ? '📞 Call ended. Thank you for contacting us!' : '📞 Panggilan diakhiri. Terima kasih telah menghubungi kami!', timestamp: new Date() }]);
   }, [stopSpeaking]);
 
   const selectVoice = (synth: SpeechSynthesis, vt: string) => {
-    const isEng = userLang.toLowerCase() === 'english';
+    const isEng = userLang.toLowerCase() !== 'indonesian';
     const langCode = isEng ? 'en' : 'id';
     const voices = synth.getVoices(), isF = vt === 'female';
     const lv = voices.filter(v => v.lang.toLowerCase().startsWith(langCode));
@@ -772,7 +772,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
     const synth = window.speechSynthesis; synth.cancel();
     const clean = text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\[.*?\]\(.*?\)/g, '').replace(/#{1,3}\s*/g, '');
     const u = new SpeechSynthesisUtterance(clean);
-    const isEng = userLang.toLowerCase() === 'english';
+    const isEng = userLang.toLowerCase() !== 'indonesian';
     u.lang = isEng ? 'en-US' : 'id-ID'; u.rate = 1.05;
     const v = selectVoice(synth, agent?.voice_type || 'female'); if (v) u.voice = v;
     speakRef.current = true; setSpeaking(true); setListening(false);
@@ -797,7 +797,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
       const lowerRt = rt.toLowerCase();
       const isWebsite = lowerRt.includes('website') || lowerRt.includes('situs web') || lowerRt.includes('selengkapnya') || lowerRt.includes('kunjungi');
       const isCS = lowerRt.includes('customer service') || lowerRt.includes('admin') || lowerRt.includes('bantuan') || lowerRt.includes(' cs ') || lowerRt.includes('hubung') || lowerRt.includes('contact');
-      const isEn = userLang.toLowerCase() === 'english';
+      const isEn = userLang.toLowerCase() !== 'indonesian';
       
       let showWebsite = false;
       let websiteLink = '';
@@ -826,7 +826,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
   const startCall = async () => {
     if (!agent) return; setConnecting(true);
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const isEng = userLang.toLowerCase() === 'english';
+    const isEng = userLang.toLowerCase() !== 'indonesian';
     if (!SR) { alert(isEng ? 'Browser not supported. Use Chrome.' : 'Browser tidak mendukung. Gunakan Chrome.'); setConnecting(false); return; }
     if (window.speechSynthesis) { window.speechSynthesis.getVoices(); await new Promise(r => setTimeout(r, 300)); }
     try {
@@ -857,7 +857,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
       if (!res.ok) throw new Error('Gagal');
       setShowComplaint(false);
       const bn = biz?.business_name || 'kami', cs = biz?.phone;
-      const isEn = userLang.toLowerCase() === 'english';
+      const isEn = userLang.toLowerCase() !== 'indonesian';
       const whatsAppBtnText = isEn ? 'Chat via WhatsApp' : 'Chat via WhatsApp';
       const msgEn = `Thank you so much **${complaint.name}** for your feedback 🙏\n\nWe deeply apologize for the inconvenience you experienced. Your complaint has been **recorded in our system** and will be promptly reviewed by the **${bn}** admin team.\n\nHere is what we will do:\n1. **The admin team will review** your complaint shortly\n2. **We will contact you** at **${complaint.phone}** for follow-up\n3. **Improvements will be made** based on your feedback\n\n${cs ? `📞 If you need **immediate** assistance, please contact our Customer Service at **${cs}** — our team is ready to help 24/7.\n\n` : ''}Your satisfaction is our top priority. Thank you for helping us do better! ❤️`;
       const msgId = `Terima kasih banyak **${complaint.name}** atas masukan Anda 🙏\n\nKami sangat menyesal atas ketidaknyamanan yang Anda alami. Keluhan Anda sudah **tercatat dalam sistem kami** dan akan segera ditinjau oleh tim admin **${bn}**.\n\nBerikut yang akan kami lakukan:\n1. **Tim admin akan mereview** keluhan Anda dalam waktu dekat\n2. **Kami akan menghubungi Anda** di nomor **${complaint.phone}** untuk tindak lanjut\n3. **Perbaikan akan segera dilakukan** berdasarkan masukan Anda\n\n${cs ? `📞 Jika Anda membutuhkan bantuan **segera**, silakan hubungi Customer Service kami di **${cs}** — tim kami siap membantu Anda 24 jam.\n\n` : ''}Kepuasan Anda adalah prioritas utama kami. Terima kasih telah membantu kami menjadi lebih baik! ❤️`;
@@ -868,7 +868,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
   };
 
   const colors = industryColors[agent?.industry || 'General'] || industryColors.General;
-  const isEn = userLang.toLowerCase() === 'english';
+  const isEn = userLang.toLowerCase() !== 'indonesian';
   const bizLabel = industryLabel[agent?.industry || 'General'] || '📍 Lokasi';
   const fmt = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
