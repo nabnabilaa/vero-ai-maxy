@@ -3,78 +3,13 @@
 import { useState, useEffect, useRef, use, useCallback } from 'react';
 import { Send, Bot, User, Loader2, Phone, PhoneOff, MapPin, AlertTriangle, Mic, MicOff, X, Search, Shield, MapPinned, Volume2, VolumeX, Star, ImagePlus, Navigation, CornerDownRight, ZoomIn, ZoomOut, Maximize2, Minimize2, Locate, Building2, Car, Bike, Footprints, ArrowUpDown, Bus, Route, CirclePlus, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Message, AgentData, PlaceResult } from './types';
+import { industryColors, industryLabel, LANGUAGES, mapKw, facilityKw, hasMap, extractQ, getLoadingText } from './constants';
+import { RichContent } from './components/ChatMessage';
+import LanguageSwitcher from './components/LanguageSwitcher';
+import RatingPopup from './components/RatingPopup';
+import PermissionPrompt from './components/PermissionPrompt';
 
-type Message = {
-  id: string; role: 'user' | 'model'; content: string; timestamp: Date;
-  showMap?: boolean; mapQuery?: string; isVoice?: boolean; imageUrl?: string;
-  showWhatsApp?: boolean; whatsAppText?: string;
-  showWebsite?: boolean; websiteLink?: string; websiteText?: string;
-  suggestions?: string[];
-};
-type AgentData = { id: string; name: string; role: string; tone: string; language: string; instructions: string; goal: string; industry: string; voice_type?: string; quick_actions?: string; };
-type PlaceResult = { name: string; lat: number; lon: number; type: string; address?: string; };
-
-const industryColors: Record<string, { primary: string; gradient: string; bg: string; accent: string }> = {
-  Hotel: { primary: '#0056D2', gradient: 'from-blue-600 to-indigo-700', bg: 'bg-blue-50', accent: '#6366F1' },
-  Retail: { primary: '#059669', gradient: 'from-emerald-600 to-teal-700', bg: 'bg-emerald-50', accent: '#10B981' },
-  Restaurant: { primary: '#EA580C', gradient: 'from-orange-500 to-red-600', bg: 'bg-orange-50', accent: '#F59E0B' },
-  'Real Estate': { primary: '#7C3AED', gradient: 'from-violet-600 to-purple-700', bg: 'bg-violet-50', accent: '#8B5CF6' },
-  General: { primary: '#0056D2', gradient: 'from-slate-700 to-slate-900', bg: 'bg-slate-50', accent: '#64748B' },
-};
-const industryLabel: Record<string, string> = { Hotel: '🏨 Hotel', Retail: '🛒 Toko', Restaurant: '🍽️ Restoran', 'Real Estate': '🏠 Properti', General: '📍 Lokasi' };
-const mapKw = ['map', 'maps', 'peta', 'lokasi', 'tempat sekitar', 'arah', 'jalan', 'dimana', 'terdekat', 'wisata', 'viral', 'kuliner', 'destinasi', 'tempat makan'];
-const facilityKw = ['fasilitas', 'kamar', 'kolam renang', 'wifi', 'sarapan', 'parkir', 'gym', 'spa', 'restoran hotel', 'harga kamar', 'check in', 'check out'];
-
-const LANGUAGES = [
-  { name: 'Indonesian', label: 'ID', flag: '🇮🇩', greeting: 'Halo! Ada yang bisa saya bantu hari ini?' },
-  { name: 'English', label: 'EN', flag: '🇬🇧', greeting: 'Hi there! How can I help you today?' },
-  { name: 'Spanish', label: 'ES', flag: '🇪🇸', greeting: '¡Hola! ¿En qué puedo ayudarte hoy?' },
-  { name: 'Japanese', label: 'JA', flag: '🇯🇵', greeting: 'こんにちは！今日はどのようなご用件でしょうか？' },
-  { name: 'Korean', label: 'KO', flag: '🇰🇷', greeting: '안녕하세요! 오늘 어떤 도움이 필요하신가요?' },
-  { name: 'Mandarin', label: 'ZH', flag: '🇨🇳', greeting: '你好！今天我能怎么帮助你？' },
-  { name: 'Arabic', label: 'AR', flag: '🇸🇦', greeting: 'مرحباً! كيف يمكنني مساعدتك اليوم؟' },
-  { name: 'French', label: 'FR', flag: '🇫🇷', greeting: 'Bonjour ! Comment puis-je vous aider aujourd\'hui ?' },
-  { name: 'German', label: 'DE', flag: '🇩🇪', greeting: 'Hallo! Wie kann ich Ihnen heute helfen?' },
-  { name: 'Russian', label: 'RU', flag: '🇷🇺', greeting: 'Здравствуйте! Чем я могу вам помочь сегодня?' },
-  { name: 'Portuguese', label: 'PT', flag: '🇵🇹', greeting: 'Olá! Como posso ajudar você hoje?' }
-];
-function hasMap(t: string) {
-  const l = t.toLowerCase();
-  // If asking about facilities, don't show map even if "di mana" or "lokasi" is mentioned
-  if (facilityKw.some(k => l.includes(k))) return false;
-  return mapKw.some(k => l.includes(k));
-}
-function extractQ(t: string) { const l = t.toLowerCase(); const m = l.match(/(?:cari|search|temukan|find)\s+(.+)/i); if (m) return m[1]; return l.replace(/map[s]?|peta|dong|tolong|bisa|kasih|lihat|tampilkan|munculkan|saya|mau/g, '').trim() || 'nearby places'; }
-
-// ── Rich Markdown Renderer ──
-function RichContent({ content, colors }: { content: string; colors: any }) {
-  const lines = content.split('\n');
-  return (
-    <div className="space-y-1.5">
-      {lines.map((line, li) => {
-        const t = line.trim();
-        if (!t) return <div key={li} className="h-1" />;
-        const num = t.match(/^(\d+)\.\s+(.*)/);
-        if (num) return (<div key={li} className="flex gap-2 items-start py-0.5"><span className="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5" style={{ background: colors.accent + '20', color: colors.accent }}>{num[1]}</span><span className="text-sm leading-relaxed">{renderInline(num[2])}</span></div>);
-        if (t.startsWith('- ') || t.startsWith('• ')) return (<div key={li} className="flex gap-2 items-start py-0.5 pl-1"><span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: colors.accent }} /><span className="text-sm leading-relaxed">{renderInline(t.slice(2))}</span></div>);
-        return <p key={li} className="text-sm leading-relaxed">{renderInline(t)}</p>;
-      })}
-    </div>
-  );
-}
-function renderInline(text: string): React.ReactNode[] {
-  const parts: React.ReactNode[] = []; const r = /(\*\*(.+?)\*\*|\*(.+?)\*|\[(.+?)\]\((.+?)\)|(https?:\/\/[^\s\)<>,\"]+))/ig; let last = 0, m;
-  while ((m = r.exec(text)) !== null) {
-    if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>);
-    if (m[2]) parts.push(<strong key={m.index} className="font-semibold">{m[2]}</strong>);
-    else if (m[3]) parts.push(<em key={m.index}>{m[3]}</em>);
-    else if (m[4] && m[5]) { parts.push(m[5].includes('maps') ? <a key={m.index} href={m[5]} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-xs font-medium hover:bg-indigo-100 transition"><MapPin className="w-3 h-3" />{m[4]}</a> : <a key={m.index} href={m[5]} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800 font-medium">{m[4]}</a>); }
-    else if (m[6]) { parts.push(m[6].includes('maps') ? <a key={m.index} href={m[6]} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-xs font-medium hover:bg-indigo-100 transition"><MapPin className="w-3 h-3" />Map Link</a> : <a key={m.index} href={m[6]} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800 font-medium">{m[6]}</a>); }
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) parts.push(<span key={last}>{text.slice(last)}</span>);
-  return parts;
-}
 
 // ── Interactive Map ──
 function InteractiveMap({ query, agentIndustry, businessInfo, isEn }: { query: string; agentIndustry: string; businessInfo: any; isEn?: boolean }) {
@@ -521,30 +456,6 @@ function InteractiveMap({ query, agentIndustry, businessInfo, isEn }: { query: s
   );
 }
 
-// ── Permission Prompt ──
-function PermissionPrompt({ onGranted, isEn }: { onGranted: () => void; isEn?: boolean }) {
-  const [loc, setLoc] = useState<'idle' | 'ok' | 'no'>('idle'); const [mic, setMic] = useState<'idle' | 'ok' | 'no'>('idle');
-  const done = loc !== 'idle' && mic !== 'idle';
-  // Proceed automatically if both are handled
-  useEffect(() => { if (done) { const t = setTimeout(onGranted, 800); return () => clearTimeout(t); } }, [done, onGranted]);
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="absolute inset-0 z-50 bg-gradient-to-b from-indigo-600 to-purple-700 flex items-center justify-center p-6">
-      <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl">
-        <div className="text-center mb-6"><div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-100 flex items-center justify-center mb-3"><Shield className="w-8 h-8 text-indigo-600" /></div><h2 className="text-lg font-bold text-gray-900">{isEn ? "Permissions Required" : "Izin Diperlukan"}</h2><p className="text-sm text-gray-500 mt-1">{isEn ? "For map & calling to work optimally" : "Agar peta & panggilan berjalan optimal"}</p></div>
-        <div className="space-y-3">
-          <button onClick={() => navigator.geolocation.getCurrentPosition(() => setLoc('ok'), () => setLoc('ok'), { enableHighAccuracy: true, timeout: 5000 })} disabled={loc !== 'idle'} className={`w-full flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${loc === 'ok' ? 'border-green-300 bg-green-50' : loc === 'no' ? 'border-amber-300 bg-amber-50' : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'}`}>
-            <MapPinned className={`w-5 h-5 ${loc === 'ok' ? 'text-green-600' : loc === 'no' ? 'text-amber-600' : 'text-indigo-600'}`} /><div className="text-left flex-1"><p className="text-sm font-semibold text-gray-800">{isEn ? "Location (GPS)" : "Lokasi (GPS)"}</p><p className="text-xs text-gray-500">{isEn ? "Your position on the map" : "Posisi Anda di peta"}</p></div>{loc === 'ok' && <span className="text-green-600 text-xs font-semibold">✓</span>}
-          </button>
-          <button onClick={async () => { try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t => t.stop()); setMic('ok'); } catch { setMic('no'); } }} disabled={mic !== 'idle'} className={`w-full flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${mic === 'ok' ? 'border-green-300 bg-green-50' : mic === 'no' ? 'border-amber-300 bg-amber-50' : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'}`}>
-            <Mic className={`w-5 h-5 ${mic === 'ok' ? 'text-green-600' : mic === 'no' ? 'text-amber-600' : 'text-indigo-600'}`} /><div className="text-left flex-1"><p className="text-sm font-semibold text-gray-800">{isEn ? "Microphone" : "Mikrofon"}</p><p className="text-xs text-gray-500">{isEn ? "Voice calling feature" : "Fitur panggilan suara"}</p></div>{mic === 'ok' && <span className="text-green-600 text-xs font-semibold">✓</span>}{mic === 'no' && <span className="text-amber-600 text-xs font-semibold">{isEn ? "Skipped" : "Lewati"}</span>}
-          </button>
-        </div>
-        {done && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 text-center"><p className="text-sm text-green-600 font-medium">{isEn ? "Ready to use! ✨" : "Siap digunakan! ✨"}</p></motion.div>}
-      </div>
-    </motion.div>
-  );
-}
-
 // ── Main Bot Page ──
 export default function BotPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -891,45 +802,15 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 relative">
           
           {/* Language Dropdown */}
-          <div className="relative">
-            <button 
-              onClick={() => setShowLangMenu(!showLangMenu)} 
-              className="h-8 sm:h-9 px-2 sm:px-3 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all text-xs sm:text-sm font-medium mr-1" 
-              title="Ganti Bahasa / Change Language"
-            >
-              {LANGUAGES.find(l => l.name === userLang)?.flag || '🌐'} <span className="ml-1.5">{LANGUAGES.find(l => l.name === userLang)?.label || 'ID'}</span>
-            </button>
-            <AnimatePresence>
-              {showLangMenu && (
-                <>
-                  <div className="fixed inset-0 z-[100]" onClick={() => setShowLangMenu(false)} />
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }} 
-                    animate={{ opacity: 1, y: 0, scale: 1 }} 
-                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                    className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-[110] overflow-hidden"
-                  >
-                    <div className="max-h-64 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
-                      {LANGUAGES.map(lang => (
-                        <button
-                          key={lang.name}
-                          onClick={() => {
-                            setUserLang(lang.name);
-                            setShowLangMenu(false);
-                            // Add a visual indicator in chat
-                            setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: `${lang.flag} ${lang.greeting}`, timestamp: new Date() }]);
-                          }}
-                          className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors ${userLang === lang.name ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
-                        >
-                          <span className="text-lg">{lang.flag}</span> {lang.name}
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
+          <LanguageSwitcher
+            userLang={userLang}
+            showLangMenu={showLangMenu}
+            setShowLangMenu={setShowLangMenu}
+            onLanguageChange={(langName, greeting, flag) => {
+              setUserLang(langName);
+              setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: `${flag} ${greeting}`, timestamp: new Date() }]);
+            }}
+          />
 
           <button onClick={() => setShowComplaint(true)} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all" title="Keluhan"><AlertTriangle className="w-4 h-4" /></button>
           <button onClick={() => { setMessages(p => [...p, { id: Date.now().toString(), role: 'user', content: '📍 Peta sekitar', timestamp: new Date() }, { id: (Date.now() + 1).toString(), role: 'model', content: `Berikut peta di sekitar **${biz?.business_name || 'lokasi kami'}**! 🗺️\n\nCari tempat viral, cafe, restoran via kolom pencarian!`, timestamp: new Date(), showMap: true, mapQuery: 'nearby places' }]); }} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all" title="Peta"><MapPin className="w-4 h-4 sm:w-4 sm:h-4" /></button>
@@ -1103,23 +984,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
                   animate={{ opacity: 1, x: 0 }} 
                   className="text-xs text-gray-400"
                 >
-                  {(() => {
-                    const loadingTexts: Record<string, [string, string, string]> = {
-                      Indonesian: [`${agent.name} sedang mengetik...`, '🔍 Mencari informasi terbaik...', '✨ Menyusun jawaban...'],
-                      English: [`${agent.name} is typing...`, '🔍 Finding the best information...', '✨ Formatting answer...'],
-                      Korean: [`${agent.name} 입력 중...`, '🔍 최적의 정보를 찾는 중...', '✨ 답변 작성 중...'],
-                      Japanese: [`${agent.name} 入力中...`, '🔍 最適な情報を検索中...', '✨ 回答を作成中...'],
-                      Mandarin: [`${agent.name} 正在输入...`, '🔍 正在查找最佳信息...', '✨ 正在整理答案...'],
-                      Spanish: [`${agent.name} está escribiendo...`, '🔍 Buscando la mejor información...', '✨ Formateando respuesta...'],
-                      Arabic: [`${agent.name} يكتب...`, '🔍 البحث عن أفضل المعلومات...', '✨ تنسيق الإجابة...'],
-                      French: [`${agent.name} écrit...`, '🔍 Recherche des meilleures informations...', '✨ Mise en forme de la réponse...'],
-                      German: [`${agent.name} tippt...`, '🔍 Beste Informationen werden gesucht...', '✨ Antwort wird formatiert...'],
-                      Russian: [`${agent.name} печатает...`, '🔍 Поиск лучшей информации...', '✨ Форматирование ответа...'],
-                      Portuguese: [`${agent.name} está digitando...`, '🔍 Buscando as melhores informações...', '✨ Formatando resposta...'],
-                    };
-                    const texts = loadingTexts[userLang] || loadingTexts.English;
-                    return loadingPhase <= 1 ? texts[0] : loadingPhase === 2 ? texts[1] : texts[2];
-                  })()}
+                  {getLoadingText(userLang, loadingPhase, agent.name)}
                 </motion.span>
               </div>
             </div>
@@ -1174,59 +1039,19 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
       </AnimatePresence>
 
       {/* Rating Popup */}
-      <AnimatePresence>
-        {showRating && !ratingSubmitted && (
-          <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center pointer-events-none">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto" onClick={() => setShowRating(false)} />
-            <motion.div initial={{ opacity: 0, y: 80, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 80 }}
-              className="relative w-full sm:w-[380px] bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 sm:mb-10 pointer-events-auto">
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 rounded-full sm:hidden" />
-              <button onClick={() => setShowRating(false)} className="absolute top-4 right-4">
-                <X className="w-5 h-5 text-gray-400 hover:text-gray-600" />
-              </button>
-              <div className="text-center mb-4">
-                <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 flex items-center justify-center mb-3">
-                  <span className="text-2xl">⭐</span>
-                </div>
-                <h3 className="font-bold text-gray-900">{isEn ? "How was your conversation?" : "Bagaimana percakapan tadi?"}</h3>
-                <p className="text-xs text-gray-500 mt-1">{isEn ? "Help us improve our service" : "Bantu kami meningkatkan layanan"}</p>
-              </div>
-              <div className="flex justify-center gap-2 mb-4">
-                {[1, 2, 3, 4, 5].map(star => (
-                  <motion.button
-                    key={star}
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.9 }}
-                    onMouseEnter={() => setRatingHover(star)}
-                    onMouseLeave={() => setRatingHover(0)}
-                    onClick={() => setRatingValue(star)}
-                    className="p-1"
-                  >
-                    <Star
-                      className={`w-9 h-9 transition-colors ${
-                        star <= (ratingHover || ratingValue)
-                          ? 'text-amber-400 fill-amber-400'
-                          : 'text-gray-200'
-                      }`}
-                    />
-                  </motion.button>
-                ))}
-              </div>
-              {ratingValue > 0 && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                  <p className="text-center text-sm text-gray-600 mb-3">
-                    {ratingValue <= 2 ? (isEn ? '😔 Sorry, we will try to do better' : '😔 Maaf, kami akan berusaha lebih baik') : ratingValue <= 3 ? (isEn ? '🙂 Thank you for your feedback' : '🙂 Terima kasih atas masukannya') : ratingValue <= 4 ? (isEn ? '😊 Glad we could help!' : '😊 Senang bisa membantu!') : (isEn ? '🤩 Thank you so much!' : '🤩 Terima kasih banyak!')}
-                  </p>
-                  <button onClick={submitRating}
-                    className={`w-full py-2.5 font-semibold rounded-xl text-white shadow-md transition-all bg-gradient-to-r ${colors.gradient}`}>
-                    {isEn ? "Submit Rating" : "Kirim Rating"}
-                  </button>
-                </motion.div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <RatingPopup
+        show={showRating}
+        submitted={ratingSubmitted}
+        ratingValue={ratingValue}
+        ratingHover={ratingHover}
+        isEn={isEn}
+        colors={colors}
+        onClose={() => setShowRating(false)}
+        onHover={setRatingHover}
+        onRate={setRatingValue}
+        onSubmit={submitRating}
+      />
+
 
       {/* Input */}
       <div className="p-2.5 sm:p-3 bg-white border-t border-gray-100">

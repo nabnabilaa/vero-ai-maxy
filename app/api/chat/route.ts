@@ -209,7 +209,7 @@ Your goal "${agent.goal}" defines WHAT you try to achieve in every conversation.
             }
 
             // ── Past Chat History (from response_cache) ranked by relevance ──
-            const pastCache = await query('SELECT question, response FROM response_cache WHERE agent_id = ? ORDER BY created_at DESC LIMIT 100', [agentId]);
+            const pastCache = await query('SELECT question, response FROM response_cache WHERE agent_id = ? ORDER BY created_at DESC LIMIT 20', [agentId]);
             if (pastCache.length > 0) {
                 const scoredPast = pastCache.map(s => ({
                     ...s,
@@ -383,6 +383,11 @@ Your goal "${agent.goal}" defines WHAT you try to achieve in every conversation.
 
     } catch (error: any) {
         console.error('Chat error:', error);
-        return NextResponse.json({ error: 'Chat failed: ' + error.message }, { status: 500 });
+        const userMsg = error.message?.includes('Groq') || error.message?.includes('Gemini')
+            ? 'AI service is temporarily unavailable. Please try again.'
+            : error.message?.includes('ECONNREFUSED') || error.message?.includes('database')
+            ? 'Service is temporarily unavailable. Please try again later.'
+            : 'Something went wrong. Please try again.';
+        return NextResponse.json({ error: userMsg }, { status: 500 });
     }
 }

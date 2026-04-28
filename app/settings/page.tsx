@@ -53,10 +53,24 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Sanitize URLs before saving
+      const sanitized = {
+        ...generalInfo,
+        website: generalInfo.website?.trim() || '',
+        maps_link: generalInfo.maps_link?.trim() || '',
+        phone: generalInfo.phone?.trim() || '',
+        email: generalInfo.email?.trim() || '',
+        business_name: generalInfo.business_name?.trim() || '',
+        city: generalInfo.city?.trim() || '',
+      };
+      // Auto-prepend https:// to website if missing
+      if (sanitized.website && !sanitized.website.match(/^https?:\/\//i)) {
+        sanitized.website = 'https://' + sanitized.website;
+      }
       const res = await fetch('/api/general-info', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(generalInfo),
+        body: JSON.stringify(sanitized),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -194,7 +208,7 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><Phone className="w-3.5 h-3.5" /> {t('settings.business.phone')}</label>
-              <input type="tel" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+              <input type="tel" maxLength={20} className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                 placeholder={t('settings.business.phonePlaceholder')} value={generalInfo.phone}
                 onChange={(e) => setGeneralInfo(prev => ({ ...prev, phone: e.target.value }))} />
             </div>
