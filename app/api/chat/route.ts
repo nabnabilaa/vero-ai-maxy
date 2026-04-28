@@ -225,6 +225,11 @@ Your goal "${agent.goal}" defines WHAT you try to achieve in every conversation.
             sys += `\n# RULES\n`;
             sys += `- STRICT LANGUAGE: You MUST communicate EXCLUSIVELY in ${userLang || agent.language}. Always reply in ${userLang || agent.language} regardless of the user's language.\n`;
             sys += `- Respond concisely and naturally (max 3 paragraphs unless the user asks for more detail).\n`;
+            if (gi?.website) {
+                sys += `- If the user asks for more details or further info, direct them to check our website.\n`;
+            } else {
+                sys += `- If the user asks for more details or further info, direct them to contact our customer service/admin.\n`;
+            }
 
             // Industry-specific rules
             const industry = agent.industry || 'General';

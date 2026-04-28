@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef, use, useCallback } from 'react';
-import { Send, Bot, User, Loader2, Phone, PhoneOff, MapPin, AlertTriangle, Mic, MicOff, X, Search, Shield, MapPinned, Volume2, VolumeX, Star, ImagePlus, Navigation, CornerDownRight, ZoomIn, ZoomOut, Maximize2, Minimize2, Locate, Building2, Car, Bike, Footprints, ArrowUpDown, Bus, Route, CirclePlus } from 'lucide-react';
+import { Send, Bot, User, Loader2, Phone, PhoneOff, MapPin, AlertTriangle, Mic, MicOff, X, Search, Shield, MapPinned, Volume2, VolumeX, Star, ImagePlus, Navigation, CornerDownRight, ZoomIn, ZoomOut, Maximize2, Minimize2, Locate, Building2, Car, Bike, Footprints, ArrowUpDown, Bus, Route, CirclePlus, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type Message = {
   id: string; role: 'user' | 'model'; content: string; timestamp: Date;
   showMap?: boolean; mapQuery?: string; isVoice?: boolean; imageUrl?: string;
-  showWhatsApp?: boolean; whatsAppText?: string; suggestions?: string[];
+  showWhatsApp?: boolean; whatsAppText?: string;
+  showWebsite?: boolean; websiteLink?: string; websiteText?: string;
+  suggestions?: string[];
 };
 type AgentData = { id: string; name: string; role: string; tone: string; language: string; instructions: string; goal: string; industry: string; voice_type?: string; quick_actions?: string; };
 type PlaceResult = { name: string; lat: number; lon: number; type: string; address?: string; };
@@ -704,9 +706,29 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
       const rt = data.response || 'Maaf, tidak ada respons.';
       const shouldMap = wm || rt.includes('google.com/maps');
       const lowerRt = rt.toLowerCase();
+      const isWebsite = lowerRt.includes('website') || lowerRt.includes('situs web') || lowerRt.includes('selengkapnya') || lowerRt.includes('kunjungi');
       const isCS = lowerRt.includes('customer service') || lowerRt.includes('admin') || lowerRt.includes('bantuan') || lowerRt.includes(' cs ') || lowerRt.includes('hubung') || lowerRt.includes('contact');
       const isEn = userLang.toLowerCase() === 'english';
-      setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: 'model', content: data.fromCache ? `⚡ ${rt}` : rt, timestamp: new Date(), showMap: shouldMap, mapQuery: shouldMap ? (mq || extractQ(rt)) : '', showWhatsApp: isCS, whatsAppText: isEn ? 'Chat via WhatsApp' : 'Chat via WhatsApp', suggestions: data.suggestions }]);
+      
+      let showWebsite = false;
+      let websiteLink = '';
+      let websiteText = '';
+      let showWhatsApp = false;
+      let whatsAppText = '';
+
+      if (isCS && biz?.phone) {
+        showWhatsApp = true;
+        whatsAppText = isEn ? 'Contact Admin' : 'Hubungi Admin';
+      } else if (isWebsite && biz?.website) {
+        showWebsite = true;
+        websiteLink = biz.website;
+        websiteText = isEn ? 'Visit Website' : 'Kunjungi Website';
+      } else if ((isWebsite || isCS) && !biz?.website && biz?.phone) {
+        showWhatsApp = true;
+        whatsAppText = isEn ? 'Contact Admin' : 'Hubungi Admin';
+      }
+
+      setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: 'model', content: data.fromCache ? `⚡ ${rt}` : rt, timestamp: new Date(), showMap: shouldMap, mapQuery: shouldMap ? (mq || extractQ(rt)) : '', showWhatsApp, whatsAppText, showWebsite, websiteLink, websiteText, suggestions: data.suggestions }]);
 
       if (data.isComplaint) { setShowComplaint(true); setChipContext('complaint'); }
     } catch (e: any) { setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: `Maaf, terjadi kesalahan: ${e.message}`, timestamp: new Date() }]); }
@@ -772,7 +794,30 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
       if (data.conversationId) setConvId(data.conversationId);
       const rt = data.response || 'Maaf, terjadi kesalahan.';
       const shouldMap = wm || rt.includes('google.com/maps');
-      setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: 'model', content: rt, timestamp: new Date(), showMap: shouldMap, mapQuery: shouldMap ? (extractQ(tr) || extractQ(rt)) : '', isVoice: true }]);
+      const lowerRt = rt.toLowerCase();
+      const isWebsite = lowerRt.includes('website') || lowerRt.includes('situs web') || lowerRt.includes('selengkapnya') || lowerRt.includes('kunjungi');
+      const isCS = lowerRt.includes('customer service') || lowerRt.includes('admin') || lowerRt.includes('bantuan') || lowerRt.includes(' cs ') || lowerRt.includes('hubung') || lowerRt.includes('contact');
+      const isEn = userLang.toLowerCase() === 'english';
+      
+      let showWebsite = false;
+      let websiteLink = '';
+      let websiteText = '';
+      let showWhatsApp = false;
+      let whatsAppText = '';
+
+      if (isCS && biz?.phone) {
+        showWhatsApp = true;
+        whatsAppText = isEn ? 'Contact Admin' : 'Hubungi Admin';
+      } else if (isWebsite && biz?.website) {
+        showWebsite = true;
+        websiteLink = biz.website;
+        websiteText = isEn ? 'Visit Website' : 'Kunjungi Website';
+      } else if ((isWebsite || isCS) && !biz?.website && biz?.phone) {
+        showWhatsApp = true;
+        whatsAppText = isEn ? 'Contact Admin' : 'Hubungi Admin';
+      }
+
+      setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: 'model', content: rt, timestamp: new Date(), showMap: shouldMap, mapQuery: shouldMap ? (extractQ(tr) || extractQ(rt)) : '', showWhatsApp, whatsAppText, showWebsite, websiteLink, websiteText, isVoice: true }]);
       if (data.isComplaint) setShowComplaint(true);
       speak(rt, () => { if (callRef.current) startListen(); });
     } catch { speak(userLang.toLowerCase() === 'english' ? 'Sorry, an error occurred.' : 'Maaf terjadi kesalahan.', () => { if (callRef.current) startListen(); }); }
@@ -1008,6 +1053,14 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
                 {msg.isVoice && <div className="flex items-center gap-1 mb-1"><Mic className="w-3 h-3 opacity-50" /><span className="text-[10px] opacity-50">Voice</span></div>}
                 {msg.role === 'model' ? <RichContent content={msg.content} colors={colors} /> : <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
                 
+                {msg.showWebsite && msg.websiteLink && (
+                  <div className="mt-3 border-t border-gray-100 pt-3">
+                    <a href={msg.websiteLink.startsWith('http') ? msg.websiteLink : `https://${msg.websiteLink}`} target="_blank" rel="noopener noreferrer" className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity">
+                      <Globe className="w-4 h-4" />
+                      {msg.websiteText}
+                    </a>
+                  </div>
+                )}
                 {msg.showWhatsApp && (
                   <div className="mt-3 border-t border-gray-100 pt-3">
                     <a href={`https://wa.me/${biz?.phone ? biz.phone.replace(/[^0-9]/g, '') : ''}`} target="_blank" rel="noopener noreferrer" className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 py-2 bg-[#25D366] text-white rounded-xl text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity">
