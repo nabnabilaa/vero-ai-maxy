@@ -22,6 +22,20 @@ const industryColors: Record<string, { primary: string; gradient: string; bg: st
 const industryLabel: Record<string, string> = { Hotel: '🏨 Hotel', Retail: '🛒 Toko', Restaurant: '🍽️ Restoran', 'Real Estate': '🏠 Properti', General: '📍 Lokasi' };
 const mapKw = ['map', 'maps', 'peta', 'lokasi', 'tempat sekitar', 'arah', 'jalan', 'dimana', 'terdekat', 'wisata', 'viral', 'kuliner', 'destinasi', 'tempat makan'];
 const facilityKw = ['fasilitas', 'kamar', 'kolam renang', 'wifi', 'sarapan', 'parkir', 'gym', 'spa', 'restoran hotel', 'harga kamar', 'check in', 'check out'];
+
+const LANGUAGES = [
+  { name: 'Indonesian', label: 'ID', flag: '🇮🇩' },
+  { name: 'English', label: 'EN', flag: '🇬🇧' },
+  { name: 'Spanish', label: 'ES', flag: '🇪🇸' },
+  { name: 'Japanese', label: 'JA', flag: '🇯🇵' },
+  { name: 'Korean', label: 'KO', flag: '🇰🇷' },
+  { name: 'Mandarin', label: 'ZH', flag: '🇨🇳' },
+  { name: 'Arabic', label: 'AR', flag: '🇸🇦' },
+  { name: 'French', label: 'FR', flag: '🇫🇷' },
+  { name: 'German', label: 'DE', flag: '🇩🇪' },
+  { name: 'Russian', label: 'RU', flag: '🇷🇺' },
+  { name: 'Portuguese', label: 'PT', flag: '🇵🇹' }
+];
 function hasMap(t: string) {
   const l = t.toLowerCase();
   // If asking about facilities, don't show map even if "di mana" or "lokasi" is mentioned
@@ -542,6 +556,8 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
   const [showComplaint, setShowComplaint] = useState(false);
   const [complaint, setComplaint] = useState({ name: '', phone: '', details: '', imageBase64: '' });
   const [showPerms, setShowPerms] = useState(false);
+  const [userLang, setUserLang] = useState<string>('Indonesian');
+  const [showLangMenu, setShowLangMenu] = useState(false);
 
   // Rating
   const [showRating, setShowRating] = useState(false);
@@ -591,7 +607,9 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
         }
       } catch { }
       const isEng = data.agent.language?.toLowerCase() === 'english';
+      setUserLang(data.agent.language || 'Indonesian');
       setMessages([{ id: 'welcome', role: 'model', content: isEng ? `Hi! 👋 I am **${data.agent.name}**, ${data.agent.role} from **${data.business?.business_name || 'our company'}**.\n\nHow can I help you? You can ask about our services, places of interest, or use the interactive map! 🗺️` : `Halo! 👋 Saya **${data.agent.name}**, ${data.agent.role} dari **${data.business?.business_name || 'kami'}**.\n\nAda yang bisa saya bantu? Tanyakan tentang layanan, tempat menarik di sekitar, atau gunakan peta interaktif! 🗺️`, timestamp: new Date() }]);
+
       if (typeof navigator !== 'undefined') { (async () => { try { const l = await navigator.permissions.query({ name: 'geolocation' }); const m = await navigator.permissions.query({ name: 'microphone' as PermissionName }); if (l.state !== 'granted' || m.state !== 'granted') setShowPerms(true); } catch { setShowPerms(true); } })(); }
     }).catch(() => setNotFound(true));
   }, [id]);
@@ -656,7 +674,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
         const res = await fetch('/api/chat', { 
            method: 'POST', 
            headers: { 'Content-Type': 'application/json' }, 
-           body: JSON.stringify({ agentId: id, message: `Saya mengirim foto ${file.name}. Tolong lihat.`, imageBase64: dataUrl, conversationId: convId, sessionType: 'chat' }) 
+           body: JSON.stringify({ agentId: id, message: `Saya mengirim foto ${file.name}. Tolong lihat.`, imageBase64: dataUrl, conversationId: convId, sessionType: 'chat', userLang }) 
         });
         const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Gagal');
         if (data.conversationId) setConvId(data.conversationId);
@@ -680,15 +698,16 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
     updateChipContext(text);
     const wm = hasMap(text), mq = wm ? extractQ(text) : '';
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: id, message: text, conversationId: convId, sessionType: 'chat' }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: id, message: text, conversationId: convId, sessionType: 'chat', userLang }) });
       const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Gagal');
       if (data.conversationId) setConvId(data.conversationId);
       const rt = data.response || 'Maaf, tidak ada respons.';
       const shouldMap = wm || rt.includes('google.com/maps');
       const lowerRt = rt.toLowerCase();
       const isCS = lowerRt.includes('customer service') || lowerRt.includes('admin') || lowerRt.includes('bantuan') || lowerRt.includes(' cs ') || lowerRt.includes('hubung') || lowerRt.includes('contact');
-      const isEn = agent?.language?.toLowerCase() === 'english';
+      const isEn = userLang.toLowerCase() === 'english';
       setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: 'model', content: data.fromCache ? `⚡ ${rt}` : rt, timestamp: new Date(), showMap: shouldMap, mapQuery: shouldMap ? (mq || extractQ(rt)) : '', showWhatsApp: isCS, whatsAppText: isEn ? 'Chat via WhatsApp' : 'Chat via WhatsApp', suggestions: data.suggestions }]);
+
       if (data.isComplaint) { setShowComplaint(true); setChipContext('complaint'); }
     } catch (e: any) { setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: `Maaf, terjadi kesalahan: ${e.message}`, timestamp: new Date() }]); }
     finally { setIsLoading(false); }
@@ -713,12 +732,12 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
     callRef.current = false; setCallActive(false); setSpeaking(false); setListening(false); setConnecting(false);
     stopSpeaking();
     if (recRef.current) { try { recRef.current.abort(); } catch { } recRef.current = null; }
-    const isEng = agent?.language?.toLowerCase() === 'english';
+    const isEng = userLang.toLowerCase() === 'english';
     setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: isEng ? '📞 Call ended. Thank you for contacting us!' : '📞 Panggilan diakhiri. Terima kasih telah menghubungi kami!', timestamp: new Date() }]);
   }, [stopSpeaking]);
 
   const selectVoice = (synth: SpeechSynthesis, vt: string) => {
-    const isEng = agent?.language?.toLowerCase() === 'english';
+    const isEng = userLang.toLowerCase() === 'english';
     const langCode = isEng ? 'en' : 'id';
     const voices = synth.getVoices(), isF = vt === 'female';
     const lv = voices.filter(v => v.lang.toLowerCase().startsWith(langCode));
@@ -731,7 +750,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
     const synth = window.speechSynthesis; synth.cancel();
     const clean = text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\[.*?\]\(.*?\)/g, '').replace(/#{1,3}\s*/g, '');
     const u = new SpeechSynthesisUtterance(clean);
-    const isEng = agent?.language?.toLowerCase() === 'english';
+    const isEng = userLang.toLowerCase() === 'english';
     u.lang = isEng ? 'en-US' : 'id-ID'; u.rate = 1.05;
     const v = selectVoice(synth, agent?.voice_type || 'female'); if (v) u.voice = v;
     speakRef.current = true; setSpeaking(true); setListening(false);
@@ -748,7 +767,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
     setMessages(p => [...p, { id: Date.now().toString(), role: 'user', content: tr, timestamp: new Date(), isVoice: true }]);
     const wm = hasMap(tr);
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: id, message: tr, conversationId: convId, sessionType: 'voice' }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: id, message: tr, conversationId: convId, sessionType: 'voice', userLang }) });
       const data = await res.json(); if (!res.ok) throw new Error(data.error);
       if (data.conversationId) setConvId(data.conversationId);
       const rt = data.response || 'Maaf, terjadi kesalahan.';
@@ -756,13 +775,13 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
       setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: 'model', content: rt, timestamp: new Date(), showMap: shouldMap, mapQuery: shouldMap ? (extractQ(tr) || extractQ(rt)) : '', isVoice: true }]);
       if (data.isComplaint) setShowComplaint(true);
       speak(rt, () => { if (callRef.current) startListen(); });
-    } catch { speak(agent?.language?.toLowerCase() === 'english' ? 'Sorry, an error occurred.' : 'Maaf terjadi kesalahan.', () => { if (callRef.current) startListen(); }); }
+    } catch { speak(userLang.toLowerCase() === 'english' ? 'Sorry, an error occurred.' : 'Maaf terjadi kesalahan.', () => { if (callRef.current) startListen(); }); }
   };
 
   const startCall = async () => {
     if (!agent) return; setConnecting(true);
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const isEng = agent?.language?.toLowerCase() === 'english';
+    const isEng = userLang.toLowerCase() === 'english';
     if (!SR) { alert(isEng ? 'Browser not supported. Use Chrome.' : 'Browser tidak mendukung. Gunakan Chrome.'); setConnecting(false); return; }
     if (window.speechSynthesis) { window.speechSynthesis.getVoices(); await new Promise(r => setTimeout(r, 300)); }
     try {
@@ -788,12 +807,12 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
   const submitComplaint = async () => {
     try {
       let cId = convId;
-      if (!cId) { const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: id, message: `[Keluhan] ${complaint.details}`, sessionType: 'chat' }) }); const d = await r.json(); if (d.conversationId) { cId = d.conversationId; setConvId(cId); } }
+      if (!cId) { const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: id, message: `[Keluhan] ${complaint.details}`, sessionType: 'chat', userLang }) }); const d = await r.json(); if (d.conversationId) { cId = d.conversationId; setConvId(cId); } }
       const res = await fetch('/api/complaints', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: cId, agentId: id, userName: complaint.name, userPhone: complaint.phone, summary: 'Keluhan pelanggan via chatbot', details: complaint.details }) });
       if (!res.ok) throw new Error('Gagal');
       setShowComplaint(false);
       const bn = biz?.business_name || 'kami', cs = biz?.phone;
-      const isEn = agent?.language?.toLowerCase() === 'english';
+      const isEn = userLang.toLowerCase() === 'english';
       const whatsAppBtnText = isEn ? 'Chat via WhatsApp' : 'Chat via WhatsApp';
       const msgEn = `Thank you so much **${complaint.name}** for your feedback 🙏\n\nWe deeply apologize for the inconvenience you experienced. Your complaint has been **recorded in our system** and will be promptly reviewed by the **${bn}** admin team.\n\nHere is what we will do:\n1. **The admin team will review** your complaint shortly\n2. **We will contact you** at **${complaint.phone}** for follow-up\n3. **Improvements will be made** based on your feedback\n\n${cs ? `📞 If you need **immediate** assistance, please contact our Customer Service at **${cs}** — our team is ready to help 24/7.\n\n` : ''}Your satisfaction is our top priority. Thank you for helping us do better! ❤️`;
       const msgId = `Terima kasih banyak **${complaint.name}** atas masukan Anda 🙏\n\nKami sangat menyesal atas ketidaknyamanan yang Anda alami. Keluhan Anda sudah **tercatat dalam sistem kami** dan akan segera ditinjau oleh tim admin **${bn}**.\n\nBerikut yang akan kami lakukan:\n1. **Tim admin akan mereview** keluhan Anda dalam waktu dekat\n2. **Kami akan menghubungi Anda** di nomor **${complaint.phone}** untuk tindak lanjut\n3. **Perbaikan akan segera dilakukan** berdasarkan masukan Anda\n\n${cs ? `📞 Jika Anda membutuhkan bantuan **segera**, silakan hubungi Customer Service kami di **${cs}** — tim kami siap membantu Anda 24 jam.\n\n` : ''}Kepuasan Anda adalah prioritas utama kami. Terima kasih telah membantu kami menjadi lebih baik! ❤️`;
@@ -804,7 +823,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
   };
 
   const colors = industryColors[agent?.industry || 'General'] || industryColors.General;
-  const isEn = agent?.language?.toLowerCase() === 'english';
+  const isEn = userLang.toLowerCase() === 'english';
   const bizLabel = industryLabel[agent?.industry || 'General'] || '📍 Lokasi';
   const fmt = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
@@ -824,13 +843,54 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
             <p className="text-[10px] sm:text-xs text-white/70 truncate">{agent.role} • {bizLabel}</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <button onClick={() => setShowRating(true)} className="px-2 py-1.5 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all text-[10px] sm:text-xs font-semibold mr-1" title={isEn ? "End Chat & Rate" : "Akhiri sesi dan beri rating"}>{isEn ? "End" : "Akhiri"}</button>
-          <button onClick={() => setShowComplaint(true)} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all" title="Keluhan"><AlertTriangle className="w-4 h-4" /></button>
-          <button onClick={() => { setMessages(p => [...p, { id: Date.now().toString(), role: 'user', content: '📍 Peta sekitar', timestamp: new Date() }, { id: (Date.now() + 1).toString(), role: 'model', content: `Berikut peta di sekitar **${biz?.business_name || 'lokasi kami'}**! 🗺️\n\nCari tempat viral, cafe, restoran via kolom pencarian!`, timestamp: new Date(), showMap: true, mapQuery: 'nearby places' }]); }} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all" title="Peta"><MapPin className="w-4 h-4 sm:w-5 sm:h-5" /></button>
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 relative">
+          
+          {/* Language Dropdown */}
+          <div className="relative">
+            <button 
+              onClick={() => setShowLangMenu(!showLangMenu)} 
+              className="h-8 sm:h-9 px-2 sm:px-3 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all text-xs sm:text-sm font-medium mr-1" 
+              title="Ganti Bahasa / Change Language"
+            >
+              {LANGUAGES.find(l => l.name === userLang)?.flag || '🌐'} <span className="ml-1.5">{LANGUAGES.find(l => l.name === userLang)?.label || 'ID'}</span>
+            </button>
+            <AnimatePresence>
+              {showLangMenu && (
+                <>
+                  <div className="fixed inset-0 z-[100]" onClick={() => setShowLangMenu(false)} />
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }} 
+                    animate={{ opacity: 1, y: 0, scale: 1 }} 
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-[110] overflow-hidden"
+                  >
+                    <div className="max-h-64 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                      {LANGUAGES.map(lang => (
+                        <button
+                          key={lang.name}
+                          onClick={() => {
+                            setUserLang(lang.name);
+                            setShowLangMenu(false);
+                            // Add a visual indicator in chat
+                            setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: `🌐 Language switched to **${lang.name}**. I will now reply in this language!`, timestamp: new Date() }]);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors ${userLang === lang.name ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
+                        >
+                          <span className="text-lg">{lang.flag}</span> {lang.name}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <button onClick={() => setShowComplaint(true)} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all" title="Keluhan"><AlertTriangle className="w-4 h-4" /></button>
+          <button onClick={() => { setMessages(p => [...p, { id: Date.now().toString(), role: 'user', content: '📍 Peta sekitar', timestamp: new Date() }, { id: (Date.now() + 1).toString(), role: 'model', content: `Berikut peta di sekitar **${biz?.business_name || 'lokasi kami'}**! 🗺️\n\nCari tempat viral, cafe, restoran via kolom pencarian!`, timestamp: new Date(), showMap: true, mapQuery: 'nearby places' }]); }} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all" title="Peta"><MapPin className="w-4 h-4 sm:w-4 sm:h-4" /></button>
           <button onClick={callActive ? endCall : startCall} disabled={connecting}
-            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${connecting ? 'bg-white/20' : callActive ? 'bg-red-500 hover:bg-red-600 shadow-lg' : 'bg-white/20 hover:bg-white/30'}`}>
-            {connecting ? <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" /> : callActive ? <PhoneOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Phone className="w-4 h-4 sm:w-5 sm:h-5" />}
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all ${connecting ? 'bg-white/20' : callActive ? 'bg-red-500 hover:bg-red-600 shadow-lg' : 'bg-white/20 hover:bg-white/30'}`}>
+            {connecting ? <Loader2 className="w-4 h-4 sm:w-4 sm:h-4 animate-spin" /> : callActive ? <PhoneOff className="w-4 h-4 sm:w-4 sm:h-4" /> : <Phone className="w-4 h-4 sm:w-4 sm:h-4" />}
           </button>
         </div>
       </div>

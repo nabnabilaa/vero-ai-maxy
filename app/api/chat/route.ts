@@ -85,7 +85,7 @@ async function callGeminiVision(sys: string, message: string, imageBase64: strin
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { agentId, message, conversationId, sessionType = 'chat', imageBase64 } = body;
+        const { agentId, message, conversationId, sessionType = 'chat', imageBase64, userLang } = body;
 
         if (!agentId || !message) return NextResponse.json({ error: 'agentId and message required' }, { status: 400 });
         if (!GROQ_API_KEY) return NextResponse.json({ error: 'GROQ_API_KEY belum dikonfigurasi.' }, { status: 500 });
@@ -135,8 +135,10 @@ You are "${agent.name}".
 - Industry: ${agent.industry}
 - Focus Topic: ${agent.topic || 'General Information'}
 - Communication Tone: ${agent.tone}
-- Primary Language: ${agent.language}
+- Primary Language: ${userLang || agent.language}
 - Goal: ${agent.goal}
+
+IMPORTANT: The user has selected "${userLang || agent.language}" as their preferred language. You MUST reply ONLY in this language!
 `;
 
             // ── Personality & Tone enforcement ──
@@ -221,7 +223,7 @@ Your goal "${agent.goal}" defines WHAT you try to achieve in every conversation.
 
             // ── Dynamic rules based on industry ──
             sys += `\n# RULES\n`;
-            sys += `- STRICT LANGUAGE: You MUST communicate EXCLUSIVELY in ${agent.language}. Always reply in ${agent.language} regardless of the user's language.\n`;
+            sys += `- STRICT LANGUAGE: You MUST communicate EXCLUSIVELY in ${userLang || agent.language}. Always reply in ${userLang || agent.language} regardless of the user's language.\n`;
             sys += `- Respond concisely and naturally (max 3 paragraphs unless the user asks for more detail).\n`;
 
             // Industry-specific rules
