@@ -226,8 +226,7 @@ async function initializeDatabase() {
         agent_id VARCHAR(255) NOT NULL,
         rating INT NOT NULL,
         feedback TEXT,
-        created_at DATETIME DEFAULT NOW(),
-        FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+        created_at DATETIME DEFAULT NOW()
       )
     `);
 

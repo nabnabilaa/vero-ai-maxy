@@ -9,7 +9,7 @@ import { Save, Key, Building2, Globe, MapPin, Loader2, Phone, Mail, Link as Link
 import { useTranslation } from '@/hooks/useTranslation';
 
 export default function SettingsPage() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { admin } = useStore();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
