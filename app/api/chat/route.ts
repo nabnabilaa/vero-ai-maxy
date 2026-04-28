@@ -51,6 +51,25 @@ async function callGroq(messages: { role: string; content: string }[]) {
 }
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+
+async function callGeminiText(sys: string, message: string, history: any[]) {
+    const chatHistory = history.map(h => ({
+        role: h.role === 'model' ? 'model' : 'user',
+        parts: [{ text: h.content }]
+    }));
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            systemInstruction: { parts: [{ text: sys }] },
+            contents: [...chatHistory, { role: 'user', parts: [{ text: message }] }]
+        })
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(`Gemini Error: ${res.status} ${err}`); }
+    const data = await res.json();
+    return { content: data.candidates?.[0]?.content?.parts?.[0]?.text || '', usage: { total_tokens: 150 } };
+}
+
 async function callGeminiVision(sys: string, message: string, imageBase64: string, history: any[]) {
     const chatHistory = history.map(h => ({
         role: h.role === 'model' ? 'model' : 'user',
@@ -270,7 +289,7 @@ Your goal "${agent.goal}" defines WHAT you try to achieve in every conversation.
 
             sys += `\n# FOLLOW-UP SUGGESTIONS
 - At the very end of your response, you MUST provide exactly 3 contextual follow-up questions that the user might want to ask next based on your response and the topic.
-- Write the suggestions in ${agent.language}.
+- Write the suggestions in ${userLang || agent.language}.
 - Format the suggestions EXACTLY like this on a new line: [SUGGESTIONS]Question 1|Question 2|Question 3[/SUGGESTIONS]`;
 
             // History
@@ -280,9 +299,16 @@ Your goal "${agent.goal}" defines WHAT you try to achieve in every conversation.
             );
             const chronoHistory = history.reverse().slice(0, -1);
 
+            // Use Gemini for non-Latin languages (better multilingual support)
+            const nonLatinLangs = ['Japanese', 'Korean', 'Mandarin', 'Arabic', 'Russian'];
+            const effectiveLang = userLang || agent.language || 'Indonesian';
+            const useGemini = nonLatinLangs.includes(effectiveLang);
+
             let result;
             if (imageBase64) {
                 result = await callGeminiVision(sys, message, imageBase64, chronoHistory);
+            } else if (useGemini) {
+                result = await callGeminiText(sys, message, chronoHistory);
             } else {
                 const msgs: { role: string; content: string }[] = [{ role: 'system', content: sys }];
                 for (const m of chronoHistory) msgs.push({ role: m.role === 'model' ? 'assistant' : 'user', content: m.content });

@@ -1103,7 +1103,23 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
                   animate={{ opacity: 1, x: 0 }} 
                   className="text-xs text-gray-400"
                 >
-                  {loadingPhase <= 1 ? (isEn ? `${agent.name} is typing...` : `${agent.name} sedang mengetik...`) : loadingPhase === 2 ? (isEn ? '🔍 Finding the best information...' : '🔍 Mencari informasi terbaik...') : (isEn ? '✨ Formatting answer...' : '✨ Menyusun jawaban...')}
+                  {(() => {
+                    const loadingTexts: Record<string, [string, string, string]> = {
+                      Indonesian: [`${agent.name} sedang mengetik...`, '🔍 Mencari informasi terbaik...', '✨ Menyusun jawaban...'],
+                      English: [`${agent.name} is typing...`, '🔍 Finding the best information...', '✨ Formatting answer...'],
+                      Korean: [`${agent.name} 입력 중...`, '🔍 최적의 정보를 찾는 중...', '✨ 답변 작성 중...'],
+                      Japanese: [`${agent.name} 入力中...`, '🔍 最適な情報を検索中...', '✨ 回答を作成中...'],
+                      Mandarin: [`${agent.name} 正在输入...`, '🔍 正在查找最佳信息...', '✨ 正在整理答案...'],
+                      Spanish: [`${agent.name} está escribiendo...`, '🔍 Buscando la mejor información...', '✨ Formateando respuesta...'],
+                      Arabic: [`${agent.name} يكتب...`, '🔍 البحث عن أفضل المعلومات...', '✨ تنسيق الإجابة...'],
+                      French: [`${agent.name} écrit...`, '🔍 Recherche des meilleures informations...', '✨ Mise en forme de la réponse...'],
+                      German: [`${agent.name} tippt...`, '🔍 Beste Informationen werden gesucht...', '✨ Antwort wird formatiert...'],
+                      Russian: [`${agent.name} печатает...`, '🔍 Поиск лучшей информации...', '✨ Форматирование ответа...'],
+                      Portuguese: [`${agent.name} está digitando...`, '🔍 Buscando as melhores informações...', '✨ Formatando resposta...'],
+                    };
+                    const texts = loadingTexts[userLang] || loadingTexts.English;
+                    return loadingPhase <= 1 ? texts[0] : loadingPhase === 2 ? texts[1] : texts[2];
+                  })()}
                 </motion.span>
               </div>
             </div>
