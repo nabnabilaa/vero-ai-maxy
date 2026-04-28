@@ -318,10 +318,10 @@ Your goal "${agent.goal}" defines WHAT you try to achieve in every conversation.
 
         // ── Extract Suggestions ──
         let suggestions: string[] = [];
-        const sugMatch = responseText.match(/\[SUGGESTIONS\](.*?)\[\/SUGGESTIONS\]/is);
+        const sugMatch = responseText.match(/\[SUGGESTIONS\]([\s\S]*?)\[\/SUGGESTIONS\]/i);
         if (sugMatch) {
             suggestions = sugMatch[1].split('|').map(s => s.trim()).filter(s => s);
-            responseText = responseText.replace(/\[SUGGESTIONS\].*?\[\/SUGGESTIONS\]/is, '').trim();
+            responseText = responseText.replace(/\[SUGGESTIONS\][\s\S]*?\[\/SUGGESTIONS\]/i, '').trim();
         }
 
         // Save model message
