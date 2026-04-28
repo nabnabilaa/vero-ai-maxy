@@ -190,11 +190,11 @@ Your goal "${agent.goal}" defines WHAT you try to achieve in every conversation.
             }
 
             // ── Past Chat History (from response_cache) ranked by relevance ──
-            const pastCache = await query('SELECT question_text, response FROM response_cache WHERE agent_id = ? ORDER BY created_at DESC LIMIT 100', [agentId]);
+            const pastCache = await query('SELECT question, response FROM response_cache WHERE agent_id = ? ORDER BY created_at DESC LIMIT 100', [agentId]);
             if (pastCache.length > 0) {
                 const scoredPast = pastCache.map(s => ({
                     ...s,
-                    score: scoreRelevance(message, s.question_text || '', s.response)
+                    score: scoreRelevance(message, s.question || '', s.response)
                 })).sort((a, b) => b.score - a.score);
 
                 // Only include top 3 that have a decent score (> 0)
@@ -202,7 +202,7 @@ Your goal "${agent.goal}" defines WHAT you try to achieve in every conversation.
                 if (relevantPast.length > 0) {
                     sys += "\n# PAST CONVERSATION HISTORY\nBelow are previous questions from users and how you answered them. Use these to ensure consistency if the current question is similar:\n";
                     for (const s of relevantPast) {
-                        sys += `User: ${s.question_text}\nYour Answer: ${truncate(s.response, 400)}\n\n`;
+                        sys += `User: ${s.question}\nYour Answer: ${truncate(s.response, 400)}\n\n`;
                     }
                 }
             }
