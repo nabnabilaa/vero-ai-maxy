@@ -80,7 +80,6 @@ export const useStore = create<AppState>()(
       scrapeUrl: (url: string, crawlMode: 'single' | 'full') => {
         set(s => ({ pendingScrapes: s.pendingScrapes + 1 }));
 
-        // Fire-and-forget: runs in the SPA JS context even if user navigates away
         fetch('/api/general-knowledge', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -89,15 +88,42 @@ export const useStore = create<AppState>()(
           .then(async (res) => {
             const data = await res.json();
             set(s => ({ pendingScrapes: Math.max(0, s.pendingScrapes - 1) }));
+            const lang = get().language;
+
+            let displayUrl = 'Website';
+            try {
+              const u = new URL(url);
+              displayUrl = u.hostname.replace(/^www\./, '');
+            } catch {
+              displayUrl = 'URL';
+            }
+
             if (res.ok) {
-              toast.success(`✅ Website "${url}" berhasil di-crawl dan ditambahkan ke Knowledge Base!`, { duration: 8000 });
+              const msg = lang === 'en'
+                ? `✅ ${displayUrl} successfully crawled and added to Knowledge Base!`
+                : `✅ ${displayUrl} berhasil di-crawl dan ditambahkan ke Knowledge Base!`;
+              toast.success(msg, { duration: 8000 });
             } else {
-              toast.error(`❌ Gagal crawl ${url}: ${data.error || 'Unknown error'}`, { duration: 8000 });
+              let errorMsg = data.error || 'Unknown error';
+              if (lang === 'en' && errorMsg.includes('memblokir bot')) {
+                errorMsg = 'Website does not have enough content or blocked the bot. Try entering the information manually.';
+              } else if (lang === 'en' && errorMsg.includes('Gagal mengekstrak')) {
+                errorMsg = 'Failed to extract URL.';
+              }
+              
+              const msg = lang === 'en'
+                ? `❌ Failed to crawl ${displayUrl}: ${errorMsg}`
+                : `❌ Gagal crawl ${displayUrl}: ${errorMsg}`;
+              toast.error(msg, { duration: 8000 });
             }
           })
           .catch((err) => {
             set(s => ({ pendingScrapes: Math.max(0, s.pendingScrapes - 1) }));
-            toast.error(`❌ Gagal crawl: ${err.message}`, { duration: 8000 });
+            const lang = get().language;
+            const msg = lang === 'en'
+                ? `❌ Failed to crawl: ${err.message}`
+                : `❌ Gagal crawl: ${err.message}`;
+            toast.error(msg, { duration: 8000 });
           });
       },
     }),
