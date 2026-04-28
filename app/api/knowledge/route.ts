@@ -33,19 +33,35 @@ export async function POST(req: NextRequest) {
     // Handle URL scraping
     if (body.type === 'url') {
         try {
-            const url = new URL(body.content);
-            const general = isGeneralUrl(url);
+            const urlObj = new URL(body.content);
+            
+            // Remove common tracking params that confuse the AI fallback
+            const keysToRemove = [];
+            for (const key of urlObj.searchParams.keys()) {
+                if (key.startsWith('_gl') || key.startsWith('_ga') || key.startsWith('_gcl') || key === 'fbclid' || key.startsWith('utm_')) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(k => urlObj.searchParams.delete(k));
+            
+            const cleanUrl = urlObj.toString();
+            const general = isGeneralUrl(urlObj);
 
-            console.log(`[Agent Knowledge] URL "${body.content}" classified as: ${general ? 'GENERAL (deep crawl)' : 'SPECIFIC (single page)'}`);
+            console.log(`[Agent Knowledge] URL "${cleanUrl}" classified as: ${general ? 'GENERAL (deep crawl)' : 'SPECIFIC (single page)'}`);
 
             if (general) {
-                const result = await crawlSite(body.content);
+                const result = await crawlSite(cleanUrl);
+                if (result.pagesCrawled === 0) {
+                    return NextResponse.json({
+                        error: 'Website tidak memiliki konten yang cukup atau memblokir bot (perlindungan ketat). Coba masukkan informasi secara manual.'
+                    }, { status: 400 });
+                }
                 finalName = `🌐 ${result.siteName} (${result.pagesCrawled} pages)`;
                 finalContent = result.fullContent;
             } else {
-                const result = await scrapeSinglePage(body.content);
-                finalName = result.title || body.content;
-                finalContent = `# ${finalName}\nURL: ${body.content}\n\n${result.markdown}`;
+                const result = await scrapeSinglePage(cleanUrl);
+                finalName = result.title || cleanUrl;
+                finalContent = `# ${finalName}\nURL: ${cleanUrl}\n\n${result.markdown}`;
             }
 
             if (!finalContent || finalContent.length < 50) {
