@@ -18,6 +18,7 @@ export default function GeneralKnowledgePage() {
   const [textInput, setTextInput] = useState('');
   const [textName, setTextName] = useState('');
   const [isAddingUrl, setIsAddingUrl] = useState(false);
+  const [crawlMode, setCrawlMode] = useState<'single' | 'full'>('single');
   const [activeTab, setActiveTab] = useState<'files' | 'urls' | 'text'>('text');
   const [loading, setLoading] = useState(true);
 
@@ -81,7 +82,7 @@ export default function GeneralKnowledgePage() {
     toast.warning(t('knowledge.urlScrapeWarning'), { duration: 5000 });
 
     const { scrapeUrl } = useStore.getState();
-    scrapeUrl(urlInput);
+    scrapeUrl(urlInput, crawlMode);
     toast.info(t('knowledge.crawlStarted'), { duration: 6000 });
     setUrlInput('');
   };
@@ -195,7 +196,7 @@ export default function GeneralKnowledgePage() {
                     <input {...getInputProps()} />
                     <Upload className="mx-auto h-8 w-8 text-blue-500 mb-3" />
                     <p className="text-sm font-medium text-gray-900">{t('knowledge.uploadTitle')}</p>
-                    <p className="text-xs text-gray-500 mt-1">{t('knowledge.uploadLimit')}</p>
+                    <p className="text-xs text-gray-500 mt-1">{t('knowledge.uploadDesc')}</p>
                   </div>
                 </motion.div>
               )}
@@ -213,6 +214,49 @@ export default function GeneralKnowledgePage() {
                       {isAddingUrl ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
                       {isAddingUrl ? t('knowledge.urlProcessing') : t('knowledge.addBtn')}
                     </Button>
+                  </div>
+
+                  {/* Crawl Mode Toggle */}
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{t('knowledge.crawlModeTitle')}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setCrawlMode('single')}
+                        className={`flex items-start gap-3 p-3 rounded-lg border-2 transition-all text-left ${
+                          crawlMode === 'single'
+                            ? 'border-blue-500 bg-blue-50 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex items-center justify-center flex-shrink-0 ${
+                          crawlMode === 'single' ? 'border-blue-500' : 'border-gray-300'
+                        }`}>
+                          {crawlMode === 'single' && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">📄 {t('knowledge.crawlModeSingle')}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{t('knowledge.crawlModeSingleDesc')}</p>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setCrawlMode('full')}
+                        className={`flex items-start gap-3 p-3 rounded-lg border-2 transition-all text-left ${
+                          crawlMode === 'full'
+                            ? 'border-blue-500 bg-blue-50 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex items-center justify-center flex-shrink-0 ${
+                          crawlMode === 'full' ? 'border-blue-500' : 'border-gray-300'
+                        }`}>
+                          {crawlMode === 'full' && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">🌐 {t('knowledge.crawlModeFull')}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{t('knowledge.crawlModeFullDesc')}</p>
+                        </div>
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -254,7 +298,7 @@ export default function GeneralKnowledgePage() {
                               : <FileText className="h-4 w-4 text-orange-500 flex-shrink-0" />}
                           <div className="overflow-hidden">
                             <span className="text-sm font-medium text-gray-700 truncate block">{source.name}</span>
-                            <span className="text-[10px] text-gray-400 uppercase">{source.type} • {source.content?.length || 0} {t('knowledge.chars')}</span>
+                            <span className="text-[10px] text-gray-400 uppercase">{source.type} • {t('knowledge.chars', { count: (source.content?.length || 0).toString() })}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
@@ -355,7 +399,7 @@ export default function GeneralKnowledgePage() {
               {/* Modal Meta */}
               <div className="px-5 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-4 text-xs text-gray-500">
                 <span className="uppercase font-medium bg-gray-200 text-gray-600 px-2 py-0.5 rounded">{selectedSource.type}</span>
-                <span>{selectedSource.content?.length?.toLocaleString() || 0} {t('knowledge.chars')}</span>
+                <span>{t('knowledge.chars', { count: (selectedSource.content?.length || 0).toLocaleString() })}</span>
                 {selectedSource.date_added && <span>{t('knowledge.modal.added')} {new Date(selectedSource.date_added).toLocaleDateString(t('common.localeCode') === 'id' ? 'id-ID' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
               </div>
 

@@ -19,7 +19,8 @@
     "type": "Tipe",
     "date": "Tanggal",
     "details": "Detail",
-    "summary": "Ringkasan"
+    "summary": "Ringkasan",
+    "localeCode": "id"
   },
   "dashboard": {
     "welcome": "Selamat Datang kembali, {name} 👋",
@@ -212,7 +213,29 @@
       "sourceAdded": "✅ Data berhasil ditambahkan!",
       "sourceDeleted": "Data berhasil dihapus",
       "savedSourcesTitle": "Data Knowledge Tersimpan",
-      "savedSourcesCount": "data"
+      "savedSourcesCount": "data",
+      "roles": {
+        "Customer Service": "Layanan Pelanggan",
+        "Assistant": "Asisten Virtual",
+        "Sales": "Sales / Marketing",
+        "Consultant": "Konsultan",
+        "Receptionist": "Resepsionis",
+        "Concierge": "Concierge",
+        "Expert": "Pakar / Ahli",
+        "Teacher": "Guru / Pengajar",
+        "Friend": "Teman",
+        "Other": "Lainnya"
+      },
+      "tones": {
+        "Professional": "Profesional",
+        "Friendly": "Ramah",
+        "Formal": "Formal / Resmi",
+        "Casual": "Kasual / Santai",
+        "Enthusiastic": "Antusias",
+        "Empathetic": "Penuh Empati",
+        "Humorous": "Humoris",
+        "Persuasive": "Persuasif"
+      }
     },
     "templates": {
       "Hotel": {
@@ -398,7 +421,23 @@
     "savedData": "Data Tersimpan",
     "savedCount": "{count} data",
     "noData": "Belum ada data knowledge.",
-    "startAdding": "Mulai dengan menambahkan informasi tentang bisnis Anda."
+    "startAdding": "Mulai dengan menambahkan informasi tentang bisnis Anda.",
+    "urlDesc": "Masukkan URL website untuk di-scrape. Pilih mode scraping di bawah.",
+    "urlProcessing": "Memproses...",
+    "crawlModeTitle": "Mode Scraping",
+    "crawlModeSingle": "Halaman Ini Saja",
+    "crawlModeSingleDesc": "Hanya ambil konten dari 1 halaman URL ini",
+    "crawlModeFull": "Crawl Seluruh Website",
+    "crawlModeFullDesc": "Jelajahi semua halaman terkait (maks 20 halaman)",
+    "scrapedConfirm": "URL ini sudah pernah di-scrape. Yakin ingin scrape ulang?",
+    "modal": {
+      "edit": "Edit",
+      "save": "Simpan",
+      "updated": "✅ Knowledge berhasil diperbarui!",
+      "saveError": "Gagal menyimpan perubahan",
+      "added": "Ditambahkan",
+      "empty": "(Konten kosong)"
+    }
   },
   "analytics": {
     "title": "Analytics & History",

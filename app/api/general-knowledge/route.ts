@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, execute, uuidv4 } from '@/lib/db';
-import { isGeneralUrl, scrapeSinglePage, crawlSite } from '@/lib/scraper';
+import { scrapeSinglePage, crawlSite } from '@/lib/scraper';
 import { parseFileContent } from '@/lib/file-parser';
 
 function getAdminFromCookie(req: NextRequest) {
@@ -30,12 +30,11 @@ export async function POST(req: NextRequest) {
 
     if (body.type === 'url') {
         try {
-            const url = new URL(body.content);
-            const general = isGeneralUrl(url);
+            const crawlMode = body.crawlMode || 'single';
 
-            console.log(`[Knowledge] URL "${body.content}" classified as: ${general ? 'GENERAL (deep crawl)' : 'SPECIFIC (single page)'}`);
+            console.log(`[Knowledge] URL "${body.content}" — mode: ${crawlMode === 'full' ? 'FULL SITE CRAWL' : 'SINGLE PAGE'}`);
 
-            if (general) {
+            if (crawlMode === 'full') {
                 // ─── Deep Crawl Mode ───
                 const result = await crawlSite(body.content);
                 finalName = `🌐 ${result.siteName} (${result.pagesCrawled} pages)`;

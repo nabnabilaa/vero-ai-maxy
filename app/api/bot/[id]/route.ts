@@ -6,7 +6,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
 
   const agent = await queryOne(`
-    SELECT id, name, role, tone, language, voice_type, instructions, goal, industry, is_active, admin_id
+    SELECT id, name, role, tone, language, voice_type, quick_actions, instructions, goal, industry, is_active, admin_id
     FROM agents WHERE id = ? AND is_active = 1
   `, [id]);
 
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   // Get business info for the admin who owns this agent
   const businessInfo = await queryOne(`
-    SELECT business_name, address, city, maps_link, phone 
+    SELECT business_name, address, city, maps_link, phone, extra_data 
     FROM general_info WHERE admin_id = ?
   `, [agent.admin_id]);
 

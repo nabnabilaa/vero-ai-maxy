@@ -19,7 +19,8 @@
     "type": "Type",
     "date": "Date",
     "details": "Details",
-    "summary": "Summary"
+    "summary": "Summary",
+    "localeCode": "en"
   },
   "dashboard": {
     "welcome": "Welcome back, {name} 👋",
@@ -212,7 +213,29 @@
       "sourceAdded": "✅ Data added successfully!",
       "sourceDeleted": "Data deleted",
       "savedSourcesTitle": "Saved Knowledge Data",
-      "savedSourcesCount": "items"
+      "savedSourcesCount": "items",
+      "roles": {
+        "Customer Service": "Customer Service",
+        "Assistant": "Virtual Assistant",
+        "Sales": "Sales / Marketing",
+        "Consultant": "Consultant",
+        "Receptionist": "Receptionist",
+        "Concierge": "Concierge",
+        "Expert": "Expert",
+        "Teacher": "Teacher",
+        "Friend": "Friend",
+        "Other": "Other"
+      },
+      "tones": {
+        "Professional": "Professional",
+        "Friendly": "Friendly",
+        "Formal": "Formal",
+        "Casual": "Casual",
+        "Enthusiastic": "Enthusiastic",
+        "Empathetic": "Empathetic",
+        "Humorous": "Humorous",
+        "Persuasive": "Persuasive"
+      }
     },
     "templates": {
       "Hotel": {
@@ -398,7 +421,23 @@
     "savedData": "Saved Data",
     "savedCount": "{count} items",
     "noData": "No knowledge data yet.",
-    "startAdding": "Start by adding information about your business."
+    "startAdding": "Start by adding information about your business.",
+    "urlDesc": "Enter a website URL to scrape. Choose the scraping mode below.",
+    "urlProcessing": "Processing...",
+    "crawlModeTitle": "Scraping Mode",
+    "crawlModeSingle": "This Page Only",
+    "crawlModeSingleDesc": "Extract content from this single URL only",
+    "crawlModeFull": "Crawl Entire Website",
+    "crawlModeFullDesc": "Explore all related pages (max 20 pages)",
+    "scrapedConfirm": "This URL has been scraped before. Are you sure you want to re-scrape?",
+    "modal": {
+      "edit": "Edit",
+      "save": "Save",
+      "updated": "✅ Knowledge updated successfully!",
+      "saveError": "Failed to save changes",
+      "added": "Added",
+      "empty": "(Empty content)"
+    }
   },
   "analytics": {
     "title": "Analytics & History",

@@ -125,23 +125,45 @@ export async function POST(req: NextRequest) {
             // Delete stale cache entry if exists
             try { await execute('DELETE FROM response_cache WHERE agent_id = ? AND question_hash = ?', [agentId, qHash]); } catch { }
 
-            // ── Build compact system instruction ──
-            let sys = `You are ${agent.name}, a ${agent.role} (${agent.industry}). Tone: ${agent.tone}. Language: ${agent.language}. Goal: ${agent.goal}.\n`;
+            // ── Build structured system instruction ──
+            // The system prompt deeply embeds agent config so the AI truly adopts
+            // the configured personality, tone, and goals.
 
-            if (agent.instructions) sys += `\nINSTRUCTIONS:\n${truncate(agent.instructions, 2000)}\n`;
+            let sys = `# IDENTITY
+You are "${agent.name}".
+- Role: ${agent.role}
+- Industry: ${agent.industry}
+- Focus Topic: ${agent.topic || 'General Information'}
+- Communication Tone: ${agent.tone}
+- Primary Language: ${agent.language}
+- Goal: ${agent.goal}
+`;
+
+            // ── Personality & Tone enforcement ──
+            sys += `\n# PERSONALITY & TONE
+You MUST strictly follow the tone "${agent.tone}" in ALL your responses.
+- If the tone is "Ramah" or "Friendly": be warm, use casual language, add empathy.
+- If the tone is "Profesional" or "Professional": be precise, factual, structured.
+- If the tone is "Formal": use respectful honorifics, avoid slang.
+- If the tone is "Santai" or "Casual": be relaxed, use informal language, be approachable.
+- If a custom tone is specified, adapt your language style to match it exactly.
+Your role as "${agent.role}" defines HOW you interact — embody this role completely.
+Your goal "${agent.goal}" defines WHAT you try to achieve in every conversation.
+`;
+
+            // ── Custom instructions (highest priority) ──
+            if (agent.instructions) sys += `\n# CUSTOM INSTRUCTIONS (HIGHEST PRIORITY)\nFollow these instructions above all other rules:\n${truncate(agent.instructions, 2000)}\n`;
 
             // ── Agent-specific knowledge (ranked by relevance) ──
             const allSources = await query('SELECT name, content FROM knowledge_sources WHERE agent_id = ?', [agentId]);
             if (allSources.length > 0) {
-                // Score and sort by relevance to the question
                 const scored = allSources.map(s => ({
                     ...s,
                     score: scoreRelevance(message, s.name, s.content)
                 })).sort((a, b) => b.score - a.score);
 
-                // Take top N most relevant
                 const topSources = scored.slice(0, MAX_SOURCES_IN_PROMPT);
-                sys += "\nKNOWLEDGE:\n";
+                sys += "\n# AGENT KNOWLEDGE\nUse this data to answer questions accurately:\n";
                 for (const s of topSources) {
                     sys += `[${s.name}]: ${truncate(s.content, MAX_KNOWLEDGE_CHARS)}\n`;
                 }
@@ -159,39 +181,90 @@ export async function POST(req: NextRequest) {
                 })).sort((a, b) => b.score - a.score);
 
                 const topGen = scored.slice(0, MAX_SOURCES_IN_PROMPT);
-                sys += "\nGENERAL KNOWLEDGE:\n";
+                sys += "\n# GENERAL COMPANY KNOWLEDGE\n";
                 for (const s of topGen) {
                     sys += `[${s.name}]: ${truncate(s.content, MAX_KNOWLEDGE_CHARS)}\n`;
                 }
             }
 
-            // Business info
-            const gi = await queryOne('SELECT gi.business_name, gi.address, gi.city, gi.phone, gi.website FROM general_info gi JOIN agents a ON gi.admin_id = a.admin_id WHERE a.id = ?', [agentId]);
-            if (gi) {
-                sys += `\nBUSINESS: ${gi.business_name || ''}, ${gi.address || ''}, ${gi.city || ''}`;
-                if (gi.phone) sys += ` | CS: ${gi.phone}`;
-                if (gi.website) sys += ` | Web: ${gi.website}`;
-                sys += '\n';
+            // ── Past Chat History (from response_cache) ranked by relevance ──
+            const pastCache = await query('SELECT question_text, response FROM response_cache WHERE agent_id = ? ORDER BY created_at DESC LIMIT 100', [agentId]);
+            if (pastCache.length > 0) {
+                const scoredPast = pastCache.map(s => ({
+                    ...s,
+                    score: scoreRelevance(message, s.question_text || '', s.response)
+                })).sort((a, b) => b.score - a.score);
+
+                // Only include top 3 that have a decent score (> 0)
+                const relevantPast = scoredPast.slice(0, 3).filter(s => s.score > 0);
+                if (relevantPast.length > 0) {
+                    sys += "\n# PAST CONVERSATION HISTORY\nBelow are previous questions from users and how you answered them. Use these to ensure consistency if the current question is similar:\n";
+                    for (const s of relevantPast) {
+                        sys += `User: ${s.question_text}\nYour Answer: ${truncate(s.response, 400)}\n\n`;
+                    }
+                }
             }
 
-            if (agent.topic) sys += `\nTOPIC: "${agent.topic}"\n`;
+            // Business info
+            const gi = await queryOne('SELECT gi.business_name, gi.address, gi.city, gi.phone, gi.website, gi.description FROM general_info gi JOIN agents a ON gi.admin_id = a.admin_id WHERE a.id = ?', [agentId]);
+            if (gi) {
+                sys += `\n# BUSINESS INFO\n`;
+                sys += `Business Name: ${gi.business_name || 'N/A'}\n`;
+                sys += `Address: ${gi.address || 'N/A'}\n`;
+                sys += `City: ${gi.city || 'N/A'}\n`;
+                if (gi.phone) sys += `Phone/CS: ${gi.phone}\n`;
+                if (gi.website) sys += `Website: ${gi.website}\n`;
+                if (gi.description) sys += `Description: ${gi.description}\n`;
+            }
 
-            sys += `\nRULES:
-- STRICT LANGUAGE ENFORCEMENT: You MUST communicate EXCLUSIVELY in the ${agent.language} language. Ignore all other languages in user input and always reply translating into ${agent.language}.
-- Respond concisely and naturally (max 3 paragraphs unless detail asked).
-- For complaints: acknowledge empathetically, ask name & phone. CS: ${gi?.phone || 'not available'}.
-- NEVER say "cari di Google Maps", "buka Google Maps", or "tanya staf hotel". YOU are the guide — give direct answers.
-- For ANY place, food, or viral recommendations: ALWAYS provide specific recommendations with names, approximate distance, descriptions, AND ALWAYS format the name as a Google Maps link like this: [Name](https://www.google.com/maps/search/Name+${encodeURIComponent(gi?.city || '')}). Focus on locations closest to ${gi?.business_name || 'our location'}.
-- For "Tempat Viral" or tourist/place questions, ONLY recommend tourist attractions, parks, photo spots, or landmarks (NO FOOD).
-- For "Makanan Viral" or food questions, ONLY recommend food stalls, cafes, or restaurants.
-- If you don't have exact data, still recommend popular places in ${gi?.city || 'the city'} that fit the category.
-- CRITICAL RULE: If you are asked about the business/hotel (prices, facilities, rules) and the info is NOT in your Knowledge, DO NOT GUESS. You must answer politely and helpfully (e.g., advising them to contact CS or check the website), and you MUST append EXACTLY "()" at the very end of your sentence. Example: "...silakan hubungi CS kami ya Kak. ()"
-- When recommending places, list them as numbered items.
+            if (agent.topic) sys += `\n# TOPIC FOCUS: "${agent.topic}"\nStay focused on this topic when answering. If asked about unrelated things, gently redirect.\n`;
 
-COMPLAINT DETECTION:
-- If the user's message expresses dissatisfaction, frustration, anger, a complaint, or reports a problem with the service/product, you MUST start your response with exactly "[COMPLAINT]" (including brackets).
-- Only use this tag for genuine complaints, NOT for neutral questions or positive feedback.
-- After the [COMPLAINT] tag, respond empathetically as normal.`;
+            // ── Dynamic rules based on industry ──
+            sys += `\n# RULES\n`;
+            sys += `- STRICT LANGUAGE: You MUST communicate EXCLUSIVELY in ${agent.language}. Always reply in ${agent.language} regardless of the user's language.\n`;
+            sys += `- Respond concisely and naturally (max 3 paragraphs unless the user asks for more detail).\n`;
+
+            // Industry-specific rules
+            const industry = agent.industry || 'General';
+            if (industry === 'Hotel') {
+                sys += `- For complaints: acknowledge empathetically, ask guest name & room number. CS: ${gi?.phone || 'not available'}.\n`;
+                sys += `- NEVER say "cari di Google Maps" or "tanya staf hotel". YOU are the concierge — give direct answers.\n`;
+                sys += `- For place/food recommendations: provide specific names, distance, descriptions, and format as Google Maps links: [Name](https://www.google.com/maps/search/Name+${encodeURIComponent(gi?.city || '')}).\n`;
+                sys += `- For "Tempat Viral" or tourist questions: recommend attractions, parks, landmarks (NOT food).\n`;
+                sys += `- For "Makanan Viral" or food questions: recommend restaurants, cafes, food stalls only.\n`;
+                sys += `- When recommending places, list them as numbered items.\n`;
+            } else if (industry === 'Restaurant') {
+                sys += `- For menu questions: provide specific items, prices, and descriptions from your knowledge.\n`;
+                sys += `- For dietary/allergy questions: be very precise and careful.\n`;
+                sys += `- For reservation questions: provide booking info, hours, and capacity.\n`;
+                sys += `- For complaints: acknowledge empathetically, ask name & phone. CS: ${gi?.phone || 'not available'}.\n`;
+            } else if (industry === 'Retail') {
+                sys += `- For product questions: provide specific items, prices, specs, and availability.\n`;
+                sys += `- For shipping/return questions: provide clear policies and timelines.\n`;
+                sys += `- For complaints: acknowledge empathetically, ask order number & phone. CS: ${gi?.phone || 'not available'}.\n`;
+            } else if (industry === 'Real Estate') {
+                sys += `- For property questions: provide specific listings, prices, specs, and locations.\n`;
+                sys += `- For mortgage/KPR questions: provide available options and requirements.\n`;
+                sys += `- Always mention viewing appointments for serious inquiries. CS: ${gi?.phone || 'not available'}.\n`;
+            } else {
+                sys += `- For complaints: acknowledge empathetically, ask name & phone. CS: ${gi?.phone || 'not available'}.\n`;
+            }
+
+            // Universal rules
+            if (gi?.city) {
+                sys += `- If you don't have exact data but the question is about places in ${gi.city}, recommend popular options that fit the category.\n`;
+            }
+            sys += `- CRITICAL: If asked about ${gi?.business_name || 'this business'} (prices, facilities, rules) and the info is NOT in your Knowledge, DO NOT GUESS. Answer politely (e.g., advise them to contact CS or check the website), and append EXACTLY "()" at the end. Example: "...silakan hubungi CS kami ya Kak. ()"\n`;
+
+            sys += `\n# COMPLAINT DETECTION
+- If the user expresses dissatisfaction, frustration, or reports a problem, start your response with exactly "[COMPLAINT]" (including brackets).
+- Only use this tag for genuine complaints, NOT neutral questions or positive feedback.
+- After the [COMPLAINT] tag, respond empathetically as "${agent.name}" would.`;
+
+            sys += `\n# FOLLOW-UP SUGGESTIONS
+- At the very end of your response, you MUST provide exactly 3 contextual follow-up questions that the user might want to ask next based on your response and the topic.
+- Write the suggestions in ${agent.language}.
+- Format the suggestions EXACTLY like this on a new line: [SUGGESTIONS]Question 1|Question 2|Question 3[/SUGGESTIONS]`;
 
             // History
             const history = await query(
@@ -243,6 +316,14 @@ COMPLAINT DETECTION:
             responseText = responseText.replace('[COMPLAINT]', '').trim();
         }
 
+        // ── Extract Suggestions ──
+        let suggestions: string[] = [];
+        const sugMatch = responseText.match(/\[SUGGESTIONS\](.*?)\[\/SUGGESTIONS\]/is);
+        if (sugMatch) {
+            suggestions = sugMatch[1].split('|').map(s => s.trim()).filter(s => s);
+            responseText = responseText.replace(/\[SUGGESTIONS\].*?\[\/SUGGESTIONS\]/is, '').trim();
+        }
+
         // Save model message
         await execute('INSERT INTO messages (id, conversation_id, role, content, tokens_used) VALUES (?, ?, ?, ?, ?)',
             [uuidv4(), convId, 'model', responseText, tokensUsed]);
@@ -265,7 +346,7 @@ COMPLAINT DETECTION:
             await execute("UPDATE conversations SET is_complaint = 1, status = 'complaint' WHERE id = ?", [convId]);
         }
 
-        return NextResponse.json({ conversationId: convId, response: responseText, tokensUsed, isComplaint, fromCache });
+        return NextResponse.json({ conversationId: convId, response: responseText, tokensUsed, isComplaint, fromCache, suggestions });
 
     } catch (error: any) {
         console.error('Chat error:', error);

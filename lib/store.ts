@@ -56,7 +56,7 @@ interface AppState {
 
   // Background Scraping
   pendingScrapes: number;
-  scrapeUrl: (url: string) => void;
+  scrapeUrl: (url: string, crawlMode: 'single' | 'full') => void;
 }
 
 export const useStore = create<AppState>()(
@@ -77,14 +77,14 @@ export const useStore = create<AppState>()(
 
       // Background Scraping
       pendingScrapes: 0,
-      scrapeUrl: (url: string) => {
+      scrapeUrl: (url: string, crawlMode: 'single' | 'full') => {
         set(s => ({ pendingScrapes: s.pendingScrapes + 1 }));
 
         // Fire-and-forget: runs in the SPA JS context even if user navigates away
         fetch('/api/general-knowledge', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'url', name: url, content: url }),
+          body: JSON.stringify({ type: 'url', name: url, content: url, crawlMode }),
         })
           .then(async (res) => {
             const data = await res.json();

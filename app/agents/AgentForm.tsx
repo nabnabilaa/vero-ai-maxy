@@ -190,7 +190,7 @@ type PlaceResult = {
 
 export default function AgentForm({ editId, onBack }: { editId?: string | null; onBack: () => void }) {
   const { admin } = useStore();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const industry = admin?.industry || 'General';
 
   const [agentConfig, setAgentConfig] = useState({
@@ -431,12 +431,14 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
       prompt += `Address: ${generalInfo?.address || 'N/A'}, ${generalInfo?.city || 'N/A'}\n`;
       prompt += `Topic: ${selectedTopic.label}\n`;
       prompt += `Description: ${selectedTopic.description}\n\n`;
+      const currentLang = language === 'id' ? 'Indonesian' : 'English';
+
       prompt += `Based on the topic and business info, generate:\n`;
       prompt += `1. A perfect "name" for this agent (e.g., "Rina" for food guide, "Budi" for concierge)\n`;
-      prompt += `2. A fitting "role" description\n`;
-      prompt += `3. An appropriate "tone" (e.g., Ramah dan Informatif)\n`;
-      prompt += `4. A clear "goal" for the agent\n`;
-      prompt += `5. Detailed "instructions" (system prompt) telling the AI exactly how to behave, what to answer, and what NOT to do. Write in Indonesian.\n`;
+      prompt += `2. A fitting "role" description. YOU MUST PICK EXACTLY ONE FROM THIS LIST: ["Customer Service", "Assistant", "Sales", "Consultant", "Receptionist", "Concierge", "Expert", "Teacher", "Friend", "Other"]\n`;
+      prompt += `3. An appropriate "tone". YOU MUST PICK EXACTLY ONE FROM THIS LIST: ["Professional", "Friendly", "Formal", "Casual", "Enthusiastic", "Empathetic", "Humorous", "Persuasive"]\n`;
+      prompt += `4. A clear "goal" for the agent. Write in ${currentLang}.\n`;
+      prompt += `5. Detailed "instructions" (system prompt) telling the AI exactly how to behave, what to answer, and what NOT to do. Write in ${currentLang}.\n`;
 
       const filledFields = Object.entries(knowledgeData).filter(([, v]) => v.trim());
       if (filledFields.length > 0) {
@@ -482,17 +484,25 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
       let agentId = editId;
 
       if (editId) {
-        await fetch('/api/agents', {
+        const res = await fetch('/api/agents', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...agentConfig, id: editId }),
         });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to update agent');
+        }
       } else {
         const res = await fetch('/api/agents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(agentConfig),
         });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to create agent');
+        }
         const data = await res.json();
         agentId = data.agent?.id;
       }
@@ -941,17 +951,37 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">{t('agents.form.agentRole')}</label>
-                      <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                      <select className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 bg-white"
                         value={agentConfig.role} onChange={(e) => setAgentConfig(prev => ({ ...prev, role: e.target.value }))}
-                        placeholder={t('agents.form.agentRolePlaceholder')} />
+                      >
+                        <option value="Customer Service">{t('agents.form.roles.Customer Service') !== 'agents.form.roles.Customer Service' ? t('agents.form.roles.Customer Service') : 'Customer Service'}</option>
+                        <option value="Assistant">{t('agents.form.roles.Assistant') !== 'agents.form.roles.Assistant' ? t('agents.form.roles.Assistant') : 'Assistant / Asisten'}</option>
+                        <option value="Sales">{t('agents.form.roles.Sales') !== 'agents.form.roles.Sales' ? t('agents.form.roles.Sales') : 'Sales / Marketing'}</option>
+                        <option value="Consultant">{t('agents.form.roles.Consultant') !== 'agents.form.roles.Consultant' ? t('agents.form.roles.Consultant') : 'Consultant / Konsultan'}</option>
+                        <option value="Receptionist">{t('agents.form.roles.Receptionist') !== 'agents.form.roles.Receptionist' ? t('agents.form.roles.Receptionist') : 'Receptionist / Resepsionis'}</option>
+                        <option value="Concierge">{t('agents.form.roles.Concierge') !== 'agents.form.roles.Concierge' ? t('agents.form.roles.Concierge') : 'Concierge'}</option>
+                        <option value="Expert">{t('agents.form.roles.Expert') !== 'agents.form.roles.Expert' ? t('agents.form.roles.Expert') : 'Expert / Ahli'}</option>
+                        <option value="Teacher">{t('agents.form.roles.Teacher') !== 'agents.form.roles.Teacher' ? t('agents.form.roles.Teacher') : 'Teacher / Guru'}</option>
+                        <option value="Friend">{t('agents.form.roles.Friend') !== 'agents.form.roles.Friend' ? t('agents.form.roles.Friend') : 'Friend / Teman'}</option>
+                        <option value="Other">{t('agents.form.roles.Other') !== 'agents.form.roles.Other' ? t('agents.form.roles.Other') : 'Other / Lainnya'}</option>
+                      </select>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">{t('agents.form.agentTone')}</label>
-                      <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                      <select className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 bg-white"
                         value={agentConfig.tone} onChange={(e) => setAgentConfig(prev => ({ ...prev, tone: e.target.value }))}
-                        placeholder={t('agents.form.agentTonePlaceholder')} />
+                      >
+                        <option value="Professional">{t('agents.form.tones.Professional') !== 'agents.form.tones.Professional' ? t('agents.form.tones.Professional') : 'Professional / Profesional'}</option>
+                        <option value="Friendly">{t('agents.form.tones.Friendly') !== 'agents.form.tones.Friendly' ? t('agents.form.tones.Friendly') : 'Friendly / Ramah'}</option>
+                        <option value="Formal">{t('agents.form.tones.Formal') !== 'agents.form.tones.Formal' ? t('agents.form.tones.Formal') : 'Formal / Resmi'}</option>
+                        <option value="Casual">{t('agents.form.tones.Casual') !== 'agents.form.tones.Casual' ? t('agents.form.tones.Casual') : 'Casual / Santai'}</option>
+                        <option value="Enthusiastic">{t('agents.form.tones.Enthusiastic') !== 'agents.form.tones.Enthusiastic' ? t('agents.form.tones.Enthusiastic') : 'Enthusiastic / Antusias'}</option>
+                        <option value="Empathetic">{t('agents.form.tones.Empathetic') !== 'agents.form.tones.Empathetic' ? t('agents.form.tones.Empathetic') : 'Empathetic / Penuh Empati'}</option>
+                        <option value="Humorous">{t('agents.form.tones.Humorous') !== 'agents.form.tones.Humorous' ? t('agents.form.tones.Humorous') : 'Humorous / Humoris'}</option>
+                        <option value="Persuasive">{t('agents.form.tones.Persuasive') !== 'agents.form.tones.Persuasive' ? t('agents.form.tones.Persuasive') : 'Persuasive / Persuasif'}</option>
+                      </select>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">{t('agents.form.agentLanguage')}</label>
@@ -1024,14 +1054,14 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                     </div>
                     <div>
                       <p className="font-bold text-lg">{agentConfig.name || t('agents.form.unnamedAgent')}</p>
-                      <p className="text-sm text-blue-100">{agentConfig.role}</p>
+                      <p className="text-sm text-blue-100">{t(`agents.form.roles.${agentConfig.role}`) !== `agents.form.roles.${agentConfig.role}` ? t(`agents.form.roles.${agentConfig.role}`) : agentConfig.role}</p>
                     </div>
                   </div>
                   <div className="space-y-2.5 pt-3 border-t border-white/20 text-sm">
                     {[
                       [t('agents.form.previewTopic'), selectedTopic?.label || agentConfig.topic || '-'],
                       [t('agents.form.previewIndustry'), agentConfig.industry],
-                      [t('agents.form.previewTone'), agentConfig.tone],
+                      [t('agents.form.previewTone'), t(`agents.form.tones.${agentConfig.tone}`) !== `agents.form.tones.${agentConfig.tone}` ? t(`agents.form.tones.${agentConfig.tone}`) : agentConfig.tone],
                       [t('agents.form.previewLanguage'), LANGUAGES.find(l => l.code === agentConfig.language)?.label || agentConfig.language],
                       [t('agents.form.previewGoal'), agentConfig.goal || '-'],
                     ].map(([label, value]) => (

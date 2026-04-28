@@ -89,6 +89,8 @@ async function initializeDatabase() {
         role VARCHAR(255) DEFAULT 'Assistant',
         tone VARCHAR(255) DEFAULT 'Professional',
         language VARCHAR(255) DEFAULT 'Indonesian',
+        voice_type VARCHAR(50) DEFAULT 'female',
+        quick_actions TEXT,
         instructions TEXT,
         goal TEXT,
         industry VARCHAR(255) DEFAULT 'General',

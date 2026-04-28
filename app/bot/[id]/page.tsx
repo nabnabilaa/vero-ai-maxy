@@ -1,15 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef, use, useCallback } from 'react';
-import { Send, Bot, User, Loader2, Phone, PhoneOff, MapPin, AlertTriangle, Mic, MicOff, X, Search, Shield, MapPinned, Volume2, VolumeX, Star, ImagePlus, Navigation, CornerDownRight, ZoomIn, ZoomOut, Maximize2, Minimize2, Locate, Building2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, Phone, PhoneOff, MapPin, AlertTriangle, Mic, MicOff, X, Search, Shield, MapPinned, Volume2, VolumeX, Star, ImagePlus, Navigation, CornerDownRight, ZoomIn, ZoomOut, Maximize2, Minimize2, Locate, Building2, Car, Bike, Footprints, ArrowUpDown, Bus, Route, CirclePlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type Message = {
   id: string; role: 'user' | 'model'; content: string; timestamp: Date;
   showMap?: boolean; mapQuery?: string; isVoice?: boolean; imageUrl?: string;
-  showWhatsApp?: boolean; whatsAppText?: string;
+  showWhatsApp?: boolean; whatsAppText?: string; suggestions?: string[];
 };
-type AgentData = { id: string; name: string; role: string; tone: string; language: string; instructions: string; goal: string; industry: string; voice_type?: string; };
+type AgentData = { id: string; name: string; role: string; tone: string; language: string; instructions: string; goal: string; industry: string; voice_type?: string; quick_actions?: string; };
 type PlaceResult = { name: string; lat: number; lon: number; type: string; address?: string; };
 
 const industryColors: Record<string, { primary: string; gradient: string; bg: string; accent: string }> = {
@@ -66,18 +66,40 @@ function InteractiveMap({ query, agentIndustry, businessInfo, isEn }: { query: s
   const bizMarkerRef = useRef<any>(null); const userMarkerRef = useRef<any>(null);
   const routeControlRef = useRef<any>(null);
   const [places, setPlaces] = useState<PlaceResult[]>([]); const [loading, setLoading] = useState(true); const [si, setSi] = useState('');
-  const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string; destName: string; fromName: string } | null>(null);
+  const [routeInfo, setRouteInfo] = useState<{ distance: string; destName: string; fromName: string; destLat: number; destLon: number; fromLat: number; fromLon: number } | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [activePlace, setActivePlace] = useState<number | null>(null);
+  const [showDirections, setShowDirections] = useState(false);
+  const [fromInput, setFromInput] = useState('');
+  const [toInput, setToInput] = useState('');
+  const [fromCoords, setFromCoords] = useState<[number, number] | null>(null);
   
   // Business location — always prioritize this for search
-  const bizCoordsRef = useRef<[number, number]>([-5.4295, 105.2618]);
+  const bizCoordsRef = useRef<[number, number]>([0, 0]);
   const hasBizRef = useRef(false);
   
-  // Parse maps_link if available
-  if (businessInfo?.maps_link?.includes('@')) {
-    const m = businessInfo.maps_link.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  // Priority 1: Use GPS coords from extra_data (saved via Settings > Auto-fill from Maps)
+  if (businessInfo?.extra_data) {
+    try {
+      const extra = typeof businessInfo.extra_data === 'string' ? JSON.parse(businessInfo.extra_data) : businessInfo.extra_data;
+      if (extra.lat && extra.lon) {
+        bizCoordsRef.current = [parseFloat(extra.lat), parseFloat(extra.lon)];
+        hasBizRef.current = true;
+      }
+    } catch { /* invalid JSON, skip */ }
+  }
+  
+  // Priority 2: Parse maps_link if available (supports multiple formats)
+  if (!hasBizRef.current && businessInfo?.maps_link) {
+    const link = businessInfo.maps_link;
+    // Format: @lat,lng or @lat,lng,zoom
+    const atMatch = link.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    // Format: ?q=lat,lng or ?ll=lat,lng
+    const qMatch = link.match(/[?&](?:q|ll|query)=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    // Format: /place/lat,lng or /dir/lat,lng
+    const pathMatch = link.match(/\/(?:place|dir)\/(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    const m = atMatch || qMatch || pathMatch;
     if (m) { bizCoordsRef.current = [parseFloat(m[1]), parseFloat(m[2])]; hasBizRef.current = true; }
   }
   
@@ -217,15 +239,32 @@ function InteractiveMap({ query, agentIndustry, businessInfo, isEn }: { query: s
   const clearRoute = () => {
     if (routeControlRef.current && mapInst.current) { mapInst.current.removeControl(routeControlRef.current); routeControlRef.current = null; }
     setRouteInfo(null);
+    setShowDirections(false);
+    setFromInput('');
+    setToInput('');
+    setFromCoords(null);
   };
 
-  const showRoute = (destLat: number, destLon: number, destName: string) => {
+  // Geocode a location string to [lat, lon, displayName]
+  const geocodeLocation = async (query: string): Promise<[number, number, string] | null> => {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&addressdetails=1`, { headers: { 'User-Agent': 'VeroAI/1.0' } });
+      const d = await res.json();
+      if (d.length > 0) return [parseFloat(d[0].lat), parseFloat(d[0].lon), d[0].display_name?.split(',').slice(0, 2).join(',') || query];
+    } catch { }
+    return null;
+  };
+
+  const showRoute = async (destLat: number, destLon: number, destName: string, customFrom?: [number, number], customFromName?: string) => {
     const L = (window as any).L, map = mapInst.current;
     if (!L || !map || !L.Routing) return;
-    const from = userLoc || bizCoordsRef.current;
-    const fromName = userLoc ? (isEn ? 'Your Location' : 'Lokasi Anda') : (businessInfo?.business_name || agentIndustry);
-    clearRoute();
+    const from = customFrom || fromCoords || userLoc || bizCoordsRef.current;
+    const fromName = customFromName || (fromCoords ? fromInput : (userLoc ? (isEn ? 'Your Location' : 'Lokasi Anda') : (businessInfo?.business_name || agentIndustry)));
+    if (routeControlRef.current) { map.removeControl(routeControlRef.current); routeControlRef.current = null; }
     setRouteLoading(true);
+    setShowDirections(true);
+    setFromInput(fromName);
+    setToInput(destName);
     const ctrl = L.Routing.control({
       waypoints: [L.latLng(from[0], from[1]), L.latLng(destLat, destLon)],
       routeWhileDragging: false,
@@ -234,22 +273,41 @@ function InteractiveMap({ query, agentIndustry, businessInfo, isEn }: { query: s
       fitSelectedRoutes: false,
       show: false,
       createMarker: () => null,
-      lineOptions: { styles: [{ color: '#6366F1', weight: 5, opacity: 0.85 }, { color: '#818CF8', weight: 8, opacity: 0.3 }], extendToWaypoints: true, missingRouteTolerance: 0 },
-      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+      lineOptions: { styles: [{ color: '#4285F4', weight: 5, opacity: 0.85 }, { color: '#4285F4', weight: 8, opacity: 0.25 }], extendToWaypoints: true, missingRouteTolerance: 0 },
+      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' }),
     }).on('routesfound', (e: any) => {
       const r = e.routes[0];
       const km = (r.summary.totalDistance / 1000).toFixed(1);
-      const mins = Math.round(r.summary.totalTime / 60);
-      setRouteInfo({ distance: `${km} km`, duration: mins < 60 ? `${mins} min` : `${Math.floor(mins/60)}h ${mins%60}m`, destName, fromName });
+      setRouteInfo({ distance: `${km} km`, destName, fromName, destLat, destLon, fromLat: from[0], fromLon: from[1] });
       setRouteLoading(false);
-      // Smooth fly to route bounds
       const bounds = L.latLngBounds([L.latLng(from[0], from[1]), L.latLng(destLat, destLon)]);
       map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 15, duration: 1.0 });
     }).on('routingerror', () => { setRouteLoading(false); }).addTo(map);
     routeControlRef.current = ctrl;
-    // Hide the default itinerary panel
     const container = ctrl.getContainer();
     if (container) container.style.display = 'none';
+  };
+
+  // Handle geocode + route for edited from/to fields
+  const handleFromSearch = async () => {
+    if (!fromInput.trim() || !routeInfo) return;
+    const result = await geocodeLocation(fromInput);
+    if (result) {
+      const [lat, lon, name] = result;
+      setFromCoords([lat, lon]);
+      setFromInput(name);
+      showRoute(routeInfo.destLat, routeInfo.destLon, routeInfo.destName, [lat, lon], name);
+    }
+  };
+
+  const handleToSearch = async () => {
+    if (!toInput.trim()) return;
+    const result = await geocodeLocation(toInput);
+    if (result) {
+      const [lat, lon, name] = result;
+      setToInput(name);
+      showRoute(lat, lon, name);
+    }
   };
 
   // Expose route function globally for popup buttons
@@ -291,32 +349,82 @@ function InteractiveMap({ query, agentIndustry, businessInfo, isEn }: { query: s
         </a>
       </div>
 
-      {/* Route Info Banner */}
+      {/* Directions Panel */}
       <AnimatePresence>
-        {(routeInfo || routeLoading) && (
+        {showDirections && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-fuchsia-500 text-white text-[11px] font-medium">
+            <div className="bg-white border-b border-gray-100">
+              {/* From / To editable fields */}
+              <div className="flex items-stretch px-3 py-3">
+                {/* Dots column */}
+                <div className="flex flex-col items-center justify-center w-7 shrink-0 py-2">
+                  <div className="w-3 h-3 rounded-full border-[2.5px] border-blue-500 bg-white" />
+                  <div className="w-0.5 flex-1 bg-gray-300 my-1" style={{ minHeight: '16px' }} />
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                </div>
+                {/* Editable input fields */}
+                <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                  <input
+                    type="text"
+                    value={fromInput}
+                    onChange={e => setFromInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleFromSearch()}
+                    placeholder={isEn ? 'Your Location' : 'Lokasi Anda'}
+                    className="px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700 border border-transparent focus:border-blue-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                  />
+                  <input
+                    type="text"
+                    value={toInput}
+                    onChange={e => setToInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleToSearch()}
+                    placeholder={isEn ? 'Choose destination...' : 'Pilih tujuan...'}
+                    className="px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-800 font-medium border border-transparent focus:border-blue-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                  />
+                </div>
+                {/* Swap & Close buttons */}
+                <div className="flex flex-col items-center justify-center gap-1 w-10 shrink-0">
+                  <button
+                    className="flex items-center justify-center w-8 h-8 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90"
+                    title={isEn ? 'Swap' : 'Tukar'}
+                    onClick={() => {
+                      if (routeInfo) {
+                        const newFrom = fromInput;
+                        const newTo = toInput;
+                        setFromInput(newTo);
+                        setToInput(newFrom);
+                        showRoute(routeInfo.fromLat, routeInfo.fromLon, routeInfo.fromName, [routeInfo.destLat, routeInfo.destLon], routeInfo.destName);
+                      }
+                    }}
+                  >
+                    <ArrowUpDown className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={clearRoute}
+                    className="flex items-center justify-center w-8 h-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all active:scale-90"
+                    title={isEn ? 'Close' : 'Tutup'}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Distance + Google Maps link bar */}
               {routeLoading ? (
-                <><Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /><span>{isEn ? 'Calculating route...' : 'Menghitung rute...'}</span></>
+                <div className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-500 border-t border-gray-100 bg-gray-50">
+                  <Loader2 className="w-4 h-4 animate-spin" />{isEn ? 'Calculating route...' : 'Menghitung rute...'}
+                </div>
               ) : routeInfo && (
-                <>
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Locate className="w-3 h-3" />
-                      <span className="text-[10px] font-semibold truncate max-w-[80px]">{routeInfo.fromName}</span>
-                    </div>
-                    <span className="text-white/60 shrink-0">→</span>
-                    <div className="flex items-center gap-1 min-w-0">
-                      <Navigation className="w-3 h-3 shrink-0" />
-                      <span className="text-[10px] font-semibold truncate">{routeInfo.destName}</span>
-                    </div>
-                  </div>
-                  <span className="shrink-0 flex items-center gap-1.5">
-                    <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded-full text-[10px]">📍 {routeInfo.distance}</span>
-                    <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded-full text-[10px]">⏱ ~{routeInfo.duration}</span>
-                  </span>
-                  <button onClick={clearRoute} className="hover:bg-white/20 rounded-full p-1 transition-colors shrink-0 active:scale-90"><X className="w-3 h-3" /></button>
-                </>
+                <div className="flex items-center gap-3 px-4 py-2 border-t border-gray-100 bg-blue-50/50">
+                  <Navigation className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span className="text-sm font-bold text-blue-700">{routeInfo.distance}</span>
+                  <a
+                    href={`https://www.google.com/maps/dir/${routeInfo.fromLat},${routeInfo.fromLon}/${routeInfo.destLat},${routeInfo.destLon}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="ml-auto text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
+                  >
+                    <MapPin className="w-3 h-3" />{isEn ? 'Google Maps' : 'Google Maps'} ↗
+                  </a>
+                </div>
               )}
             </div>
           </motion.div>
@@ -580,10 +688,19 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
       const lowerRt = rt.toLowerCase();
       const isCS = lowerRt.includes('customer service') || lowerRt.includes('admin') || lowerRt.includes('bantuan') || lowerRt.includes(' cs ') || lowerRt.includes('hubung') || lowerRt.includes('contact');
       const isEn = agent?.language?.toLowerCase() === 'english';
-      setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: 'model', content: data.fromCache ? `⚡ ${rt}` : rt, timestamp: new Date(), showMap: shouldMap, mapQuery: shouldMap ? (mq || extractQ(rt)) : '', showWhatsApp: isCS, whatsAppText: isEn ? 'Chat via WhatsApp' : 'Chat via WhatsApp' }]);
+      setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: 'model', content: data.fromCache ? `⚡ ${rt}` : rt, timestamp: new Date(), showMap: shouldMap, mapQuery: shouldMap ? (mq || extractQ(rt)) : '', showWhatsApp: isCS, whatsAppText: isEn ? 'Chat via WhatsApp' : 'Chat via WhatsApp', suggestions: data.suggestions }]);
       if (data.isComplaint) { setShowComplaint(true); setChipContext('complaint'); }
     } catch (e: any) { setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: `Maaf, terjadi kesalahan: ${e.message}`, timestamp: new Date() }]); }
     finally { setIsLoading(false); }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+      setInput(suggestion);
+      // Wait for state to update, then send
+      setTimeout(() => {
+          const btn = document.getElementById('vero-send-btn');
+          if (btn) btn.click();
+      }, 50);
   };
 
   // ── Voice (inline) ──
@@ -596,13 +713,16 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
     callRef.current = false; setCallActive(false); setSpeaking(false); setListening(false); setConnecting(false);
     stopSpeaking();
     if (recRef.current) { try { recRef.current.abort(); } catch { } recRef.current = null; }
-    setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: '📞 Panggilan diakhiri. Terima kasih telah menghubungi kami!', timestamp: new Date() }]);
+    const isEng = agent?.language?.toLowerCase() === 'english';
+    setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: isEng ? '📞 Call ended. Thank you for contacting us!' : '📞 Panggilan diakhiri. Terima kasih telah menghubungi kami!', timestamp: new Date() }]);
   }, [stopSpeaking]);
 
   const selectVoice = (synth: SpeechSynthesis, vt: string) => {
+    const isEng = agent?.language?.toLowerCase() === 'english';
+    const langCode = isEng ? 'en' : 'id';
     const voices = synth.getVoices(), isF = vt === 'female';
-    const lv = voices.filter(v => v.lang.startsWith('id'));
-    if (lv.length > 0) { const g = lv.filter(v => isF ? /female|wanita|zira|damayanti|siti/i.test(v.name) : /male|pria|david|adam/i.test(v.name)); return g[0] || lv[0]; }
+    const lv = voices.filter(v => v.lang.toLowerCase().startsWith(langCode));
+    if (lv.length > 0) { const g = lv.filter(v => isF ? /female|wanita|zira|damayanti|siti|samantha|victoria|karen|susan|google us english|google uk english female/i.test(v.name) : /male|pria|david|adam|alex|daniel|mark|google uk english male/i.test(v.name)); return g[0] || lv[0]; }
     return voices[0] || null;
   };
 
@@ -610,7 +730,9 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
     if (!('speechSynthesis' in window)) { onDone?.(); return; }
     const synth = window.speechSynthesis; synth.cancel();
     const clean = text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\[.*?\]\(.*?\)/g, '').replace(/#{1,3}\s*/g, '');
-    const u = new SpeechSynthesisUtterance(clean); u.lang = 'id-ID'; u.rate = 1.05;
+    const u = new SpeechSynthesisUtterance(clean);
+    const isEng = agent?.language?.toLowerCase() === 'english';
+    u.lang = isEng ? 'en-US' : 'id-ID'; u.rate = 1.05;
     const v = selectVoice(synth, agent?.voice_type || 'female'); if (v) u.voice = v;
     speakRef.current = true; setSpeaking(true); setListening(false);
     u.onend = () => { speakRef.current = false; setSpeaking(false); onDone?.(); };
@@ -634,23 +756,30 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
       setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: 'model', content: rt, timestamp: new Date(), showMap: shouldMap, mapQuery: shouldMap ? (extractQ(tr) || extractQ(rt)) : '', isVoice: true }]);
       if (data.isComplaint) setShowComplaint(true);
       speak(rt, () => { if (callRef.current) startListen(); });
-    } catch { speak('Maaf terjadi kesalahan.', () => { if (callRef.current) startListen(); }); }
+    } catch { speak(agent?.language?.toLowerCase() === 'english' ? 'Sorry, an error occurred.' : 'Maaf terjadi kesalahan.', () => { if (callRef.current) startListen(); }); }
   };
 
   const startCall = async () => {
     if (!agent) return; setConnecting(true);
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { alert('Browser tidak mendukung. Gunakan Chrome.'); setConnecting(false); return; }
+    const isEng = agent?.language?.toLowerCase() === 'english';
+    if (!SR) { alert(isEng ? 'Browser not supported. Use Chrome.' : 'Browser tidak mendukung. Gunakan Chrome.'); setConnecting(false); return; }
     if (window.speechSynthesis) { window.speechSynthesis.getVoices(); await new Promise(r => setTimeout(r, 300)); }
     try {
-      const rec = new SR(); rec.lang = 'id-ID'; rec.continuous = false; rec.interimResults = false;
+      const rec = new SR(); rec.lang = isEng ? 'en-US' : 'id-ID'; rec.continuous = false; rec.interimResults = false;
       rec.onstart = () => setListening(true);
       rec.onresult = (e: any) => { setListening(false); onSpeech(e.results[e.resultIndex][0].transcript); };
       rec.onerror = (e: any) => { if (e.error !== 'no-speech' && e.error !== 'aborted') console.warn(e.error); };
       rec.onend = () => { setTimeout(() => { if (callRef.current && !speakRef.current) { try { recRef.current?.start(); } catch { } } }, 300); };
       recRef.current = rec; callRef.current = true; setCallActive(true); setConnecting(false);
-      setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: `📞 Panggilan dimulai dengan **${agent.name}**. Silakan bicara — saya mendengarkan!\n\n*Klik tombol 🔇 untuk menghentikan suara AI kapan saja.*`, timestamp: new Date() }]);
-      speak(`Halo, saya ${agent.name} dari ${biz?.business_name || 'kami'}. Ada yang bisa saya bantu?`, () => { if (callRef.current) startListen(); });
+      const startMsg = isEng 
+        ? `📞 Call started with **${agent.name}**. Please speak — I'm listening!\n\n*Click the 🔇 button to stop the AI voice at any time.*` 
+        : `📞 Panggilan dimulai dengan **${agent.name}**. Silakan bicara — saya mendengarkan!\n\n*Klik tombol 🔇 untuk menghentikan suara AI kapan saja.*`;
+      setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: startMsg, timestamp: new Date() }]);
+      const greeting = isEng
+        ? `Hello, I am ${agent.name} from ${biz?.business_name || 'us'}. How can I help you?`
+        : `Halo, saya ${agent.name} dari ${biz?.business_name || 'kami'}. Ada yang bisa saya bantu?`;
+      speak(greeting, () => { if (callRef.current) startListen(); });
     } catch { endCall(); }
   };
 
@@ -715,7 +844,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
               <div className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
                 <span className="text-xs font-medium">
-                  {speaking ? `${agent.name} sedang bicara...` : listening ? 'Mendengarkan Anda...' : 'Memproses...'}
+                  {speaking ? `${agent.name} ${isEn ? 'is speaking...' : 'sedang bicara...'}` : listening ? (isEn ? 'Listening...' : 'Mendengarkan Anda...') : (isEn ? 'Processing...' : 'Memproses...')}
                 </span>
                 <span className="text-[10px] text-white/60 ml-1 font-mono">{fmt(callTime)}</span>
               </div>
@@ -741,53 +870,64 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
 
       {/* Dynamic Quick Chips */}
       <div className="px-3 sm:px-4 py-2 flex gap-2 overflow-x-auto bg-gray-50/80 border-b border-gray-100" style={{ scrollbarWidth: 'none' }}>
-        {(chipContext === 'initial' ? (isEn ? [
-          { label: '🗺️ Nearby Map', action: 'Can I see the map and interesting places around here?' },
-          { label: '🍽️ Viral Food', action: 'What are some viral foods or nearby culinary recommendations?' },
-          { label: '⭐ Places', action: 'Please recommend interesting tourist spots or destinations nearby' },
-          { label: '💰 Price', action: 'How much are the prices and are there any promos right now?' },
-          { label: '❓ FAQ', action: 'What are some frequently asked questions?' },
-        ] : [
-          { label: '🗺️ Peta Sekitar', action: 'Boleh lihat peta dan tempat menarik di sekitar sini?' },
-          { label: '🍽️ Makanan Viral', action: 'Apa saja rekomendasi makanan viral atau kuliner terdekat dari sini?' },
-          { label: '⭐ Tempat Viral', action: 'Tolong rekomendasikan tempat wisata atau destinasi menarik di sekitar sini dong' },
-          { label: '💰 Harga', action: 'Berapa harga dan ada promo apa saja saat ini?' },
-          { label: '❓ FAQ', action: 'Apa saja layanan atau pertanyaan yang sering ditanyakan?' },
-        ]) : chipContext === 'info' ? (isEn ? [
-          { label: '💰 Price & Promo', action: 'What are the prices and available promos?' },
-          { label: '📅 Booking', action: 'How can I make a booking or reservation?' },
-          { label: '📍 Location', action: 'Where is the exact location? And how to get there?' },
-          { label: '🗺️ Map', action: 'Can I see the map and interesting places around here?' },
-          { label: '📞 Contact Admin', action: 'I want to speak directly with an admin' },
-        ] : [
-          { label: '💰 Harga & Promo', action: 'Berapa harga dan promo yang tersedia?' },
-          { label: '📅 Booking', action: 'Bagaimana cara melakukan booking atau reservasi?' },
-          { label: '📍 Lokasi', action: 'Dimana lokasi lengkapnya? Dan bagaimana cara ke sana?' },
-          { label: '🗺️ Peta', action: 'Boleh lihat peta dan tempat menarik di sekitar sini?' },
-          { label: '📞 Hubungi Admin', action: 'Saya ingin berbicara langsung dengan admin' },
-        ]) : chipContext === 'booking' ? (isEn ? [
-          { label: '💳 Payment Info', action: 'What payment methods are accepted?' },
-          { label: '📋 Terms', action: 'What are the terms and conditions?' },
-          { label: '📞 Contact Admin', action: 'I want to speak directly with an admin to book' },
-          { label: '🗺️ Location', action: 'Where is the exact location?' },
-          { label: '⭐ Reviews', action: 'What do other customers say about this?' },
-        ] : [
-          { label: '💳 Cara Bayar', action: 'Metode pembayaran apa saja yang diterima?' },
-          { label: '📋 Syarat & Ketentuan', action: 'Apa saja syarat dan ketentuannya?' },
-          { label: '📞 Hubungi Admin', action: 'Saya ingin berbicara langsung dengan admin untuk booking' },
-          { label: '🗺️ Lokasi', action: 'Dimana lokasi lengkapnya?' },
-          { label: '⭐ Review', action: 'Apa kata pelanggan lain tentang layanan ini?' },
-        ]) : (isEn ? [
-          { label: '📝 Complaint Form', action: 'I want to fill out a formal complaint form' },
-          { label: '📞 Call CS', action: 'I want to speak directly with customer service' },
-          { label: '🔄 Other Issue', action: 'I have another issue I want to report' },
-          { label: '⬅️ Main Menu', action: 'Return to main menu, I have another question' },
-        ] : [
-          { label: '📝 Form Keluhan', action: 'Saya ingin mengisi formulir keluhan resmi' },
-          { label: '📞 Hubungi CS', action: 'Saya ingin bicara langsung dengan customer service' },
-          { label: '🔄 Masalah Lain', action: 'Saya punya masalah lain yang ingin disampaikan' },
-          { label: '⬅️ Menu Awal', action: 'Kembali ke menu awal, ada pertanyaan lain' },
-        ])).map(c => (<button key={c.label} onClick={() => { setInput(c.action); if (c.label.includes('Menu Awal') || c.label.includes('Main Menu')) setChipContext('initial'); }} className="shrink-0 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-[11px] sm:text-xs font-medium text-gray-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 transition-all shadow-sm active:scale-95">{c.label}</button>))}
+        {(() => {
+          if (chipContext === 'initial' && agent?.quick_actions) {
+            try {
+              const parsed = JSON.parse(agent.quick_actions);
+              if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+                return parsed.map((c: any) => (<button key={c.label} onClick={() => setInput(c.action)} className="shrink-0 px-3 py-1.5 bg-white border border-indigo-100 rounded-full text-[11px] sm:text-xs font-medium text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm active:scale-95">{c.label}</button>));
+              }
+            } catch { }
+          }
+          const chips = (chipContext === 'initial' ? (isEn ? [
+            { label: '🗺️ Nearby Map', action: 'Can I see the map and interesting places around here?' },
+            { label: '🍽️ Viral Food', action: 'What are some viral foods or nearby culinary recommendations?' },
+            { label: '⭐ Places', action: 'Please recommend interesting tourist spots or destinations nearby' },
+            { label: '💰 Price', action: 'How much are the prices and are there any promos right now?' },
+            { label: '❓ FAQ', action: 'What are some frequently asked questions?' },
+          ] : [
+            { label: '🗺️ Peta Sekitar', action: 'Boleh lihat peta dan tempat menarik di sekitar sini?' },
+            { label: '🍽️ Makanan Viral', action: 'Apa saja rekomendasi makanan viral atau kuliner terdekat dari sini?' },
+            { label: '⭐ Tempat Viral', action: 'Tolong rekomendasikan tempat wisata atau destinasi menarik di sekitar sini dong' },
+            { label: '💰 Harga', action: 'Berapa harga dan ada promo apa saja saat ini?' },
+            { label: '❓ FAQ', action: 'Apa saja layanan atau pertanyaan yang sering ditanyakan?' },
+          ]) : chipContext === 'info' ? (isEn ? [
+            { label: '💰 Price & Promo', action: 'What are the prices and available promos?' },
+            { label: '📅 Booking', action: 'How can I make a booking or reservation?' },
+            { label: '📍 Location', action: 'Where is the exact location? And how to get there?' },
+            { label: '🗺️ Map', action: 'Can I see the map and interesting places around here?' },
+            { label: '📞 Contact Admin', action: 'I want to speak directly with an admin' },
+          ] : [
+            { label: '💰 Harga & Promo', action: 'Berapa harga dan promo yang tersedia?' },
+            { label: '📅 Booking', action: 'Bagaimana cara melakukan booking atau reservasi?' },
+            { label: '📍 Lokasi', action: 'Dimana lokasi lengkapnya? Dan bagaimana cara ke sana?' },
+            { label: '🗺️ Peta', action: 'Boleh lihat peta dan tempat menarik di sekitar sini?' },
+            { label: '📞 Hubungi Admin', action: 'Saya ingin berbicara langsung dengan admin' },
+          ]) : chipContext === 'booking' ? (isEn ? [
+            { label: '💳 Payment Info', action: 'What payment methods are accepted?' },
+            { label: '📋 Terms', action: 'What are the terms and conditions?' },
+            { label: '📞 Contact Admin', action: 'I want to speak directly with an admin to book' },
+            { label: '🗺️ Location', action: 'Where is the exact location?' },
+            { label: '⭐ Reviews', action: 'What do other customers say about this?' },
+          ] : [
+            { label: '💳 Cara Bayar', action: 'Metode pembayaran apa saja yang diterima?' },
+            { label: '📋 Syarat & Ketentuan', action: 'Apa saja syarat dan ketentuannya?' },
+            { label: '📞 Hubungi Admin', action: 'Saya ingin berbicara langsung dengan admin untuk booking' },
+            { label: '🗺️ Lokasi', action: 'Dimana lokasi lengkapnya?' },
+            { label: '⭐ Review', action: 'Apa kata pelanggan lain tentang layanan ini?' },
+          ]) : (isEn ? [
+            { label: '📝 Complaint Form', action: 'I want to fill out a formal complaint form' },
+            { label: '📞 Call CS', action: 'I want to speak directly with customer service' },
+            { label: '🔄 Other Issue', action: 'I have another issue I want to report' },
+            { label: '⬅️ Main Menu', action: 'Return to main menu, I have another question' },
+          ] : [
+            { label: '📝 Form Keluhan', action: 'Saya ingin mengisi formulir keluhan resmi' },
+            { label: '📞 Hubungi CS', action: 'Saya ingin bicara langsung dengan customer service' },
+            { label: '🔄 Masalah Lain', action: 'Saya punya masalah lain yang ingin disampaikan' },
+            { label: '⬅️ Menu Awal', action: 'Kembali ke menu awal, ada pertanyaan lain' },
+          ]));
+          return chips.map(c => (<button key={c.label} onClick={() => { setInput(c.action); if (c.label.includes('Menu Awal') || c.label.includes('Main Menu')) setChipContext('initial'); }} className="shrink-0 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-[11px] sm:text-xs font-medium text-gray-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 transition-all shadow-sm active:scale-95">{c.label}</button>));
+        })()}
       </div>
 
       {/* Messages */}
@@ -818,6 +958,16 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
                 )}
               </div>
               {msg.showMap && msg.role === 'model' && <InteractiveMap query={msg.mapQuery || ''} agentIndustry={agent.industry} businessInfo={biz} isEn={isEn} />}
+              {msg.suggestions && msg.suggestions.length > 0 && msg.role === 'model' && (
+                <div className="mt-2.5 flex flex-col gap-1.5 px-0.5">
+                  {msg.suggestions.map((s, idx) => (
+                    <button key={idx} onClick={() => handleSuggestionClick(s)} className="text-left flex items-start gap-2 px-3 py-2 rounded-xl bg-white border border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50 shadow-sm transition-all active:scale-[0.98] group">
+                      <div className="w-4 h-4 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors"><Search className="w-2.5 h-2.5" /></div>
+                      <span className="text-xs text-gray-700 font-medium group-hover:text-indigo-700 transition-colors leading-relaxed">{s}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <p className={`text-[10px] mt-1 px-1 ${msg.role === 'user' ? 'text-right' : ''} text-gray-400`}>{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
             </div>
           </motion.div>
@@ -909,8 +1059,8 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 flex items-center justify-center mb-3">
                   <span className="text-2xl">⭐</span>
                 </div>
-                <h3 className="font-bold text-gray-900">Bagaimana percakapan tadi?</h3>
-                <p className="text-xs text-gray-500 mt-1">Bantu kami meningkatkan layanan</p>
+                <h3 className="font-bold text-gray-900">{isEn ? "How was your conversation?" : "Bagaimana percakapan tadi?"}</h3>
+                <p className="text-xs text-gray-500 mt-1">{isEn ? "Help us improve our service" : "Bantu kami meningkatkan layanan"}</p>
               </div>
               <div className="flex justify-center gap-2 mb-4">
                 {[1, 2, 3, 4, 5].map(star => (
@@ -936,11 +1086,11 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
               {ratingValue > 0 && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
                   <p className="text-center text-sm text-gray-600 mb-3">
-                    {ratingValue <= 2 ? '😔 Maaf, kami akan berusaha lebih baik' : ratingValue <= 3 ? '🙂 Terima kasih atas masukannya' : ratingValue <= 4 ? '😊 Senang bisa membantu!' : '🤩 Terima kasih banyak!'}
+                    {ratingValue <= 2 ? (isEn ? '😔 Sorry, we will try to do better' : '😔 Maaf, kami akan berusaha lebih baik') : ratingValue <= 3 ? (isEn ? '🙂 Thank you for your feedback' : '🙂 Terima kasih atas masukannya') : ratingValue <= 4 ? (isEn ? '😊 Glad we could help!' : '😊 Senang bisa membantu!') : (isEn ? '🤩 Thank you so much!' : '🤩 Terima kasih banyak!')}
                   </p>
                   <button onClick={submitRating}
                     className={`w-full py-2.5 font-semibold rounded-xl text-white shadow-md transition-all bg-gradient-to-r ${colors.gradient}`}>
-                    Kirim Rating
+                    {isEn ? "Submit Rating" : "Kirim Rating"}
                   </button>
                 </motion.div>
               )}

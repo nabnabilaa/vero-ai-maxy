@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     for (const source of stale) {
         try {
-            const city = source.city || 'Bandar Lampung';
+            const city = source.city || source.address || 'lokasi bisnis';
             const bizName = source.business_name || '';
             const sourceName = source.name || '';
 
