@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, use, useCallback } from 'react';
 import { Send, Bot, User, Loader2, Phone, PhoneOff, MapPin, AlertTriangle, Mic, MicOff, X, Search, Shield, MapPinned, Volume2, VolumeX, Star, ImagePlus, Navigation, CornerDownRight, ZoomIn, ZoomOut, Maximize2, Minimize2, Locate, Building2, Car, Bike, Footprints, ArrowUpDown, Bus, Route, CirclePlus, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Message, AgentData, PlaceResult } from './types';
-import { industryColors, industryLabel, LANGUAGES, mapKw, facilityKw, hasMap, extractQ, getLoadingText } from './constants';
+import { industryColors, industryLabel, LANGUAGES, mapKw, facilityKw, hasMap, extractQ, getLoadingText, langCodeMap } from './constants';
 import { RichContent } from './components/ChatMessage';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import RatingPopup from './components/RatingPopup';
@@ -670,8 +670,8 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
   }, [stopSpeaking]);
 
   const selectVoice = (synth: SpeechSynthesis, vt: string) => {
-    const isEng = userLang.toLowerCase() !== 'indonesian';
-    const langCode = isEng ? 'en' : 'id';
+    const fullCode = langCodeMap[userLang] || 'en-US';
+    const langCode = fullCode.split('-')[0];
     const voices = synth.getVoices(), isF = vt === 'female';
     const lv = voices.filter(v => v.lang.toLowerCase().startsWith(langCode));
     if (lv.length > 0) { const g = lv.filter(v => isF ? /female|wanita|zira|damayanti|siti|samantha|victoria|karen|susan|google us english|google uk english female/i.test(v.name) : /male|pria|david|adam|alex|daniel|mark|google uk english male/i.test(v.name)); return g[0] || lv[0]; }
@@ -683,8 +683,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
     const synth = window.speechSynthesis; synth.cancel();
     const clean = text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\[.*?\]\(.*?\)/g, '').replace(/#{1,3}\s*/g, '');
     const u = new SpeechSynthesisUtterance(clean);
-    const isEng = userLang.toLowerCase() !== 'indonesian';
-    u.lang = isEng ? 'en-US' : 'id-ID'; u.rate = 1.05;
+    u.lang = langCodeMap[userLang] || 'en-US'; u.rate = 1.05;
     const v = selectVoice(synth, agent?.voice_type || 'female'); if (v) u.voice = v;
     speakRef.current = true; setSpeaking(true); setListening(false);
     u.onend = () => { speakRef.current = false; setSpeaking(false); onDone?.(); };
@@ -741,7 +740,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
     if (!SR) { alert(isEng ? 'Browser not supported. Use Chrome.' : 'Browser tidak mendukung. Gunakan Chrome.'); setConnecting(false); return; }
     if (window.speechSynthesis) { window.speechSynthesis.getVoices(); await new Promise(r => setTimeout(r, 300)); }
     try {
-      const rec = new SR(); rec.lang = isEng ? 'en-US' : 'id-ID'; rec.continuous = false; rec.interimResults = false;
+      const rec = new SR(); rec.lang = langCodeMap[userLang] || 'en-US'; rec.continuous = false; rec.interimResults = false;
       rec.onstart = () => setListening(true);
       rec.onresult = (e: any) => { setListening(false); onSpeech(e.results[e.resultIndex][0].transcript); };
       rec.onerror = (e: any) => { if (e.error !== 'no-speech' && e.error !== 'aborted') console.warn(e.error); };

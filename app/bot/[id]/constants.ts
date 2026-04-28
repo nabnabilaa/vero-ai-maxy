@@ -1,4 +1,4 @@
-import { Message, AgentData, IndustryColors } from './types';
+import { IndustryColors } from './types';
 
 export const industryColors: Record<string, IndustryColors> = {
   Hotel: { primary: '#0056D2', gradient: 'from-blue-600 to-indigo-700', bg: 'bg-blue-50', accent: '#6366F1' },
@@ -13,8 +13,59 @@ export const industryLabel: Record<string, string> = {
   'Real Estate': '🏠 Properti', General: '📍 Lokasi',
 };
 
-export const mapKw = ['map', 'maps', 'peta', 'lokasi', 'tempat sekitar', 'arah', 'jalan', 'dimana', 'terdekat', 'wisata', 'viral', 'kuliner', 'destinasi', 'tempat makan'];
-export const facilityKw = ['fasilitas', 'kamar', 'kolam renang', 'wifi', 'sarapan', 'parkir', 'gym', 'spa', 'restoran hotel', 'harga kamar', 'check in', 'check out'];
+// Multilingual map keywords — triggers interactive map display
+export const mapKw = [
+  // EN
+  'map', 'maps', 'nearby', 'directions', 'location', 'where is', 'closest', 'around here',
+  // ID
+  'peta', 'lokasi', 'tempat sekitar', 'arah', 'jalan', 'dimana', 'terdekat', 'wisata', 'viral', 'kuliner', 'destinasi', 'tempat makan',
+  // KO
+  '지도', '위치', '근처', '주변', '어디',
+  // JA
+  '地図', '場所', '近く', '周辺', 'どこ',
+  // ZH
+  '地图', '位置', '附近', '周围', '在哪',
+  // ES
+  'mapa', 'ubicación', 'cerca', 'dirección',
+  // AR
+  'خريطة', 'موقع', 'قريب', 'بالقرب',
+  // FR
+  'carte', 'emplacement', 'près', 'itinéraire',
+  // DE
+  'karte', 'standort', 'in der nähe', 'richtung',
+  // RU
+  'карта', 'местоположение', 'рядом', 'направление',
+  // PT
+  'mapa', 'localização', 'perto', 'direção',
+];
+
+export const facilityKw = [
+  // EN
+  'facilities', 'room', 'pool', 'wifi', 'breakfast', 'parking', 'gym', 'spa', 'check in', 'check out', 'amenities',
+  // ID
+  'fasilitas', 'kamar', 'kolam renang', 'sarapan', 'parkir', 'restoran hotel', 'harga kamar',
+  // KO
+  '시설', '객실', '수영장', '조식', '주차',
+  // JA
+  '施設', '客室', 'プール', '朝食', '駐車場',
+  // ZH
+  '设施', '客房', '游泳池', '早餐', '停车场',
+];
+
+// BCP-47 language codes for TTS/STT
+export const langCodeMap: Record<string, string> = {
+  Indonesian: 'id-ID',
+  English: 'en-US',
+  Korean: 'ko-KR',
+  Japanese: 'ja-JP',
+  Mandarin: 'zh-CN',
+  Spanish: 'es-ES',
+  Arabic: 'ar-SA',
+  French: 'fr-FR',
+  German: 'de-DE',
+  Russian: 'ru-RU',
+  Portuguese: 'pt-BR',
+};
 
 export const LANGUAGES = [
   { name: 'Indonesian', label: 'ID', flag: '🇮🇩', greeting: 'Halo! Ada yang bisa saya bantu hari ini?' },
