@@ -31,25 +31,39 @@ export async function POST(req: NextRequest) {
     if (body.type === 'url') {
         try {
             const crawlMode = body.crawlMode || 'single';
+            
+            const urlObj = new URL(body.content);
+            const keysToRemove = [];
+            for (const key of urlObj.searchParams.keys()) {
+                if (key.startsWith('_gl') || key.startsWith('_ga') || key.startsWith('_gcl') || key === 'fbclid' || key.startsWith('utm_')) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(k => urlObj.searchParams.delete(k));
+            const cleanUrl = urlObj.toString();
 
-            console.log(`[Knowledge] URL "${body.content}" — mode: ${crawlMode === 'full' ? 'FULL SITE CRAWL' : 'SINGLE PAGE'}`);
+            console.log(`[Knowledge] URL "${cleanUrl}" — mode: ${crawlMode === 'full' ? 'FULL SITE CRAWL' : 'SINGLE PAGE'}`);
 
             if (crawlMode === 'full') {
                 // ─── Deep Crawl Mode ───
-                const result = await crawlSite(body.content);
+                const result = await crawlSite(cleanUrl);
+                if (result.pagesCrawled === 0) {
+                    return NextResponse.json({
+                        error: 'Website tidak memiliki konten yang cukup atau memblokir bot (perlindungan ketat). Coba masukkan informasi secara manual.'
+                    }, { status: 400 });
+                }
                 finalName = `🌐 ${result.siteName} (${result.pagesCrawled} pages)`;
                 finalContent = result.fullContent;
             } else {
                 // ─── Single Page Mode ───
-                const result = await scrapeSinglePage(body.content);
-                finalName = result.title || body.content;
-                finalContent = `# ${finalName}\nURL: ${body.content}\n\n${result.markdown}`;
-            }
-
-            if (!finalContent || finalContent.length < 50) {
-                return NextResponse.json({
-                    error: 'Website tidak memiliki konten yang cukup atau memblokir bot. Coba URL lain.'
-                }, { status: 400 });
+                const result = await scrapeSinglePage(cleanUrl);
+                if (!result.markdown || result.markdown.length < 50) {
+                    return NextResponse.json({
+                        error: 'Website tidak memiliki konten yang cukup atau memblokir bot (perlindungan ketat). Coba URL lain.'
+                    }, { status: 400 });
+                }
+                finalName = result.title || cleanUrl;
+                finalContent = `# ${finalName}\nURL: ${cleanUrl}\n\n${result.markdown}`;
             }
 
         } catch (e: any) {
