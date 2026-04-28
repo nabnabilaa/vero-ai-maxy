@@ -125,6 +125,16 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'Agent ID required' }, { status: 400 });
 
-  await execute('DELETE FROM agents WHERE id = ? AND admin_id = ?', [id, admin.id]);
-  return NextResponse.json({ success: true });
+  try {
+    // Delete complaints first to satisfy foreign key constraints (since ON DELETE CASCADE is missing on complaints)
+    await execute('DELETE FROM complaints WHERE agent_id = ?', [id]);
+    
+    // Delete the agent (this will cascade delete knowledge_sources, conversations, etc.)
+    await execute('DELETE FROM agents WHERE id = ? AND admin_id = ?', [id, admin.id]);
+    
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Agent DELETE Error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
