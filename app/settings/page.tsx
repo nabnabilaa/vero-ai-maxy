@@ -77,29 +77,31 @@ export default function SettingsPage() {
     }));
   };
 
+  const isEn = language === 'en';
+
   // Industry-specific extra fields
   const industryFields: Record<string, { key: string; label: string; placeholder: string }[]> = {
     Hotel: [
-      { key: 'star_rating', label: 'Rating Bintang', placeholder: 'Contoh: 4 Stars' },
-      { key: 'total_rooms', label: 'Jumlah Kamar', placeholder: 'Contoh: 120 kamar' },
-      { key: 'check_in_time', label: 'Waktu Check-in', placeholder: 'Contoh: 14:00' },
-      { key: 'check_out_time', label: 'Waktu Check-out', placeholder: 'Contoh: 12:00' },
+      { key: 'star_rating', label: isEn ? 'Star Rating' : 'Rating Bintang', placeholder: isEn ? 'E.g., 4 Stars' : 'Contoh: 4 Stars' },
+      { key: 'total_rooms', label: isEn ? 'Total Rooms' : 'Jumlah Kamar', placeholder: isEn ? 'E.g., 120 rooms' : 'Contoh: 120 kamar' },
+      { key: 'check_in_time', label: isEn ? 'Check-in Time' : 'Waktu Check-in', placeholder: isEn ? 'E.g., 14:00' : 'Contoh: 14:00' },
+      { key: 'check_out_time', label: isEn ? 'Check-out Time' : 'Waktu Check-out', placeholder: isEn ? 'E.g., 12:00' : 'Contoh: 12:00' },
     ],
     Retail: [
-      { key: 'store_type', label: 'Tipe Toko', placeholder: 'Contoh: Electronics, Fashion, Grocery' },
-      { key: 'operating_hours', label: 'Jam Operasional', placeholder: 'Contoh: 10:00-22:00 setiap hari' },
-      { key: 'payment', label: 'Metode Pembayaran', placeholder: 'Contoh: Cash, Debit, Kredit, QRIS, OVO, GoPay' },
+      { key: 'store_type', label: isEn ? 'Store Type' : 'Tipe Toko', placeholder: isEn ? 'E.g., Electronics, Fashion, Grocery' : 'Contoh: Electronics, Fashion, Grocery' },
+      { key: 'operating_hours', label: isEn ? 'Operating Hours' : 'Jam Operasional', placeholder: isEn ? 'E.g., 10:00-22:00 everyday' : 'Contoh: 10:00-22:00 setiap hari' },
+      { key: 'payment', label: isEn ? 'Payment Methods' : 'Metode Pembayaran', placeholder: isEn ? 'E.g., Cash, Debit, Credit, QRIS' : 'Contoh: Cash, Debit, Kredit, QRIS, OVO, GoPay' },
     ],
     Restaurant: [
-      { key: 'cuisine_type', label: 'Tipe Masakan', placeholder: 'Contoh: Indonesian, Japanese, Italian' },
-      { key: 'operating_hours', label: 'Jam Operasional', placeholder: 'Contoh: 11:00-22:00' },
-      { key: 'halal_status', label: 'Status Halal', placeholder: 'Contoh: Halal Certified, Non-Halal, Mixed' },
-      { key: 'capacity', label: 'Kapasitas', placeholder: 'Contoh: 80 kursi indoor, 20 outdoor' },
+      { key: 'cuisine_type', label: isEn ? 'Cuisine Type' : 'Tipe Masakan', placeholder: isEn ? 'E.g., Indonesian, Japanese, Italian' : 'Contoh: Indonesian, Japanese, Italian' },
+      { key: 'operating_hours', label: isEn ? 'Operating Hours' : 'Jam Operasional', placeholder: isEn ? 'E.g., 11:00-22:00' : 'Contoh: 11:00-22:00' },
+      { key: 'halal_status', label: isEn ? 'Halal Status' : 'Status Halal', placeholder: isEn ? 'E.g., Halal Certified, Non-Halal, Mixed' : 'Contoh: Halal Certified, Non-Halal, Mixed' },
+      { key: 'capacity', label: isEn ? 'Capacity' : 'Kapasitas', placeholder: isEn ? 'E.g., 80 seats indoor, 20 outdoor' : 'Contoh: 80 kursi indoor, 20 outdoor' },
     ],
     'Real Estate': [
-      { key: 'property_types', label: 'Tipe Properti', placeholder: 'Rumah, Apartemen, Ruko, Tanah' },
-      { key: 'coverage_area', label: 'Area Layanan', placeholder: 'Contoh: Jabodetabek, Bali, Surabaya' },
-      { key: 'license', label: 'Lisensi/Sertifikasi', placeholder: 'Contoh: REI Member, AREBI Licensed' },
+      { key: 'property_types', label: isEn ? 'Property Types' : 'Tipe Properti', placeholder: isEn ? 'E.g., House, Apartment, Land' : 'Rumah, Apartemen, Ruko, Tanah' },
+      { key: 'coverage_area', label: isEn ? 'Coverage Area' : 'Area Layanan', placeholder: isEn ? 'E.g., Jakarta, Bali, Surabaya' : 'Contoh: Jabodetabek, Bali, Surabaya' },
+      { key: 'license', label: isEn ? 'License/Certification' : 'Lisensi/Sertifikasi', placeholder: isEn ? 'E.g., REI Member, AREBI Licensed' : 'Contoh: REI Member, AREBI Licensed' },
     ],
     General: [],
   };
@@ -284,39 +286,6 @@ export default function SettingsPage() {
               <label className="text-sm font-medium text-gray-700 block mb-2">{t('settings.account.email')}</label>
               <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm bg-gray-50" value={admin?.email || ''} disabled />
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* API */}
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Key className="w-5 h-5 text-gray-600" /> {t('settings.api.title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <input type="password" className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm bg-gray-50" value="••••••••••••••••••••" disabled />
-            <Button variant="outline" disabled className="rounded-xl">{t('settings.api.managed')}</Button>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">{t('settings.api.footer')}</p>
-        </CardContent>
-      </Card>
-
-      {/* Demo Accounts */}
-      <Card className="rounded-2xl bg-blue-50 border-blue-100">
-        <CardHeader>
-          <CardTitle className="text-blue-800 text-base">{t('settings.demo.title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-sm text-blue-700 space-y-1">
-            <p>{t('settings.demo.passwordHint', { password: 'admin123' })}</p>
-            <ul className="list-disc list-inside space-y-0.5 text-blue-600">
-              <li>hotel@vero.ai — Hotel Panel</li>
-              <li>retail@vero.ai — Retail Panel</li>
-              <li>restaurant@vero.ai — Restaurant Panel</li>
-              <li>realestate@vero.ai — Real Estate Panel</li>
-              <li>admin@vero.ai — General Panel</li>
-            </ul>
           </div>
         </CardContent>
       </Card>

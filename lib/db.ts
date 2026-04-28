@@ -72,7 +72,7 @@ async function initializeDatabase() {
         city VARCHAR(255) DEFAULT '',
         phone VARCHAR(255) DEFAULT '',
         email VARCHAR(255) DEFAULT '',
-        website VARCHAR(255) DEFAULT '',
+        website TEXT,
         maps_link TEXT DEFAULT (''),
         description TEXT,
         extra_data TEXT,
