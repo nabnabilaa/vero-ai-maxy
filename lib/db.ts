@@ -238,7 +238,7 @@ async function initializeDatabase() {
       { email: 'retail@vero.ai', password: 'admin123', name: 'Retail Admin', industry: 'Retail', org: 'Vero Retail' },
       { email: 'restaurant@vero.ai', password: 'admin123', name: 'Restaurant Admin', industry: 'Restaurant', org: 'Vero Restaurant' },
       { email: 'realestate@vero.ai', password: 'admin123', name: 'Real Estate Admin', industry: 'Real Estate', org: 'Vero Properties' },
-      { email: 'admin@vero.ai', password: 'admin123', name: 'Super Admin', industry: 'General', org: 'Maxy Academy' },
+      { email: 'admin@vero.ai', password: 'admin123', name: 'Admin', industry: 'General', org: 'Maxy Academy' },
     ];
 
     for (const admin of admins) {
