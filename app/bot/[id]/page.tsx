@@ -26,17 +26,17 @@ const mapKw = ['map', 'maps', 'peta', 'lokasi', 'tempat sekitar', 'arah', 'jalan
 const facilityKw = ['fasilitas', 'kamar', 'kolam renang', 'wifi', 'sarapan', 'parkir', 'gym', 'spa', 'restoran hotel', 'harga kamar', 'check in', 'check out'];
 
 const LANGUAGES = [
-  { name: 'Indonesian', label: 'ID', flag: '🇮🇩' },
-  { name: 'English', label: 'EN', flag: '🇬🇧' },
-  { name: 'Spanish', label: 'ES', flag: '🇪🇸' },
-  { name: 'Japanese', label: 'JA', flag: '🇯🇵' },
-  { name: 'Korean', label: 'KO', flag: '🇰🇷' },
-  { name: 'Mandarin', label: 'ZH', flag: '🇨🇳' },
-  { name: 'Arabic', label: 'AR', flag: '🇸🇦' },
-  { name: 'French', label: 'FR', flag: '🇫🇷' },
-  { name: 'German', label: 'DE', flag: '🇩🇪' },
-  { name: 'Russian', label: 'RU', flag: '🇷🇺' },
-  { name: 'Portuguese', label: 'PT', flag: '🇵🇹' }
+  { name: 'Indonesian', label: 'ID', flag: '🇮🇩', greeting: 'Halo! Ada yang bisa saya bantu hari ini?' },
+  { name: 'English', label: 'EN', flag: '🇬🇧', greeting: 'Hi there! How can I help you today?' },
+  { name: 'Spanish', label: 'ES', flag: '🇪🇸', greeting: '¡Hola! ¿En qué puedo ayudarte hoy?' },
+  { name: 'Japanese', label: 'JA', flag: '🇯🇵', greeting: 'こんにちは！今日はどのようなご用件でしょうか？' },
+  { name: 'Korean', label: 'KO', flag: '🇰🇷', greeting: '안녕하세요! 오늘 어떤 도움이 필요하신가요?' },
+  { name: 'Mandarin', label: 'ZH', flag: '🇨🇳', greeting: '你好！今天我能怎么帮助你？' },
+  { name: 'Arabic', label: 'AR', flag: '🇸🇦', greeting: 'مرحباً! كيف يمكنني مساعدتك اليوم؟' },
+  { name: 'French', label: 'FR', flag: '🇫🇷', greeting: 'Bonjour ! Comment puis-je vous aider aujourd\'hui ?' },
+  { name: 'German', label: 'DE', flag: '🇩🇪', greeting: 'Hallo! Wie kann ich Ihnen heute helfen?' },
+  { name: 'Russian', label: 'RU', flag: '🇷🇺', greeting: 'Здравствуйте! Чем я могу вам помочь сегодня?' },
+  { name: 'Portuguese', label: 'PT', flag: '🇵🇹', greeting: 'Olá! Como posso ajudar você hoje?' }
 ];
 function hasMap(t: string) {
   const l = t.toLowerCase();
@@ -917,7 +917,7 @@ export default function BotPage({ params }: { params: Promise<{ id: string }> })
                             setUserLang(lang.name);
                             setShowLangMenu(false);
                             // Add a visual indicator in chat
-                            setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: `🌐 Language switched to **${lang.name}**. I will now reply in this language!`, timestamp: new Date() }]);
+                            setMessages(p => [...p, { id: Date.now().toString(), role: 'model', content: `${lang.flag} ${lang.greeting}`, timestamp: new Date() }]);
                           }}
                           className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors ${userLang === lang.name ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
                         >
