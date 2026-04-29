@@ -252,18 +252,19 @@ export default function AgentForm({ editId, onBack }: { editId?: string | null; 
 
   const { getRootProps: getTopicDropProps, getInputProps: getTopicInputProps, isDragActive: isTopicDragActive } = useDropzone({ onDrop: onDropTopicFile });
 
-  const templates = TOPIC_TEMPLATES[industry] || TOPIC_TEMPLATES.General;
+  const templateIndustry = TOPIC_TEMPLATES[industry] ? industry : 'General';
+  const templates = TOPIC_TEMPLATES[templateIndustry];
   const presetTopic = templates.topics.find(t => t.value === agentConfig.topic);
   
   // Re-map preset topic with translations
   const selectedTopic = presetTopic ? {
     ...presetTopic,
-    label: t(`agents.templates.${industry}.${agentConfig.topic}.label` as any),
-    description: t(`agents.templates.${industry}.${agentConfig.topic}.description` as any),
+    label: t(`agents.templates.${templateIndustry}.${agentConfig.topic}.label` as any),
+    description: t(`agents.templates.${templateIndustry}.${agentConfig.topic}.description` as any),
     fields: presetTopic.fields.map(f => ({
       ...f,
-      label: t(`agents.templates.${industry}.${agentConfig.topic}.fields.${f.key}.label` as any),
-      placeholder: t(`agents.templates.${industry}.${agentConfig.topic}.fields.${f.key}.placeholder` as any)
+      label: t(`agents.templates.${templateIndustry}.${agentConfig.topic}.fields.${f.key}.label` as any),
+      placeholder: t(`agents.templates.${templateIndustry}.${agentConfig.topic}.fields.${f.key}.placeholder` as any)
     }))
   } : (agentConfig.topic === '__ai_custom__' && aiGeneratedFields.length > 0 ? { value: '__ai_custom__', label: customTopicLabel, description: t('agents.form.profileDesc'), fields: aiGeneratedFields } : null);
   const selectedTopicFields: TopicField[] = selectedTopic?.fields || [];
@@ -630,8 +631,8 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                 className={`rounded-2xl border-2 p-6 text-left transition-all hover:shadow-lg hover:border-blue-300 hover:scale-[1.02] ${agentConfig.topic === topic.value ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white'
                   }`}
               >
-                <h3 className="font-semibold text-gray-900 mb-1">{t(`agents.templates.${industry}.${topic.value}.label` as any)}</h3>
-                <p className="text-sm text-gray-500">{t(`agents.templates.${industry}.${topic.value}.description` as any)}</p>
+                <h3 className="font-semibold text-gray-900 mb-1">{t(`agents.templates.${templateIndustry}.${topic.value}.label` as any)}</h3>
+                <p className="text-sm text-gray-500">{t(`agents.templates.${templateIndustry}.${topic.value}.description` as any)}</p>
                 <div className="mt-3 flex items-center gap-1 text-xs text-blue-600 font-medium">
                   <BookOpen className="w-3 h-3" />
                   {t('agents.form.itemAdded', { name: topic.fields.length.toString() })} {/* Using itemAdded as a general count indicator or similar */}
@@ -996,32 +997,11 @@ Return JSON: {"topicLabel": "string", "fields": [{"key": "string", "label": "str
                       </select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">🎤 {t('agents.form.agentVoice')}</label>
-                      <div className="flex gap-3">
-                        {[
-                          { value: 'female', label: `👩 ${t('agents.form.voiceFemale')}`, desc: t('agents.form.voiceFemaleDesc') },
-                          { value: 'male', label: `👨 ${t('agents.form.voiceMale')}`, desc: t('agents.form.voiceMaleDesc') },
-                        ].map((v) => (
-                          <button key={v.value} type="button"
-                            onClick={() => setAgentConfig(prev => ({ ...prev, voice_type: v.value }))}
-                            className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${agentConfig.voice_type === v.value
-                                ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200'
-                                : 'border-gray-200 hover:border-gray-300'
-                              }`}>
-                            <span className="text-sm font-medium">{v.label}</span>
-                            <p className="text-[10px] text-gray-500 mt-0.5">{v.desc}</p>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">{t('agents.form.agentGoal')}</label>
-                      <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
-                        value={agentConfig.goal} onChange={(e) => setAgentConfig(prev => ({ ...prev, goal: e.target.value }))}
-                        placeholder={t('agents.form.agentGoalPlaceholder')} />
-                    </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">{t('agents.form.agentGoal')}</label>
+                    <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                      value={agentConfig.goal} onChange={(e) => setAgentConfig(prev => ({ ...prev, goal: e.target.value }))}
+                      placeholder={t('agents.form.agentGoalPlaceholder')} />
                   </div>
                 </CardContent>
               </Card>

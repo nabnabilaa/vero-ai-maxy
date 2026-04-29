@@ -285,24 +285,6 @@ export default function SettingsPage() {
         </Card>
       )}
 
-      {/* Profile */}
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Building2 className="w-5 h-5 text-gray-600" /> {t('settings.account.title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">{t('settings.account.name')}</label>
-              <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm bg-gray-50" value={admin?.name || ''} disabled />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">{t('settings.account.email')}</label>
-              <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm bg-gray-50" value={admin?.email || ''} disabled />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="flex justify-end pb-8">
         <Button onClick={handleSave} disabled={saving}
