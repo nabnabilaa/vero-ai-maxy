@@ -4,19 +4,24 @@ import bcrypt from 'bcryptjs';
 
 export async function POST(req: NextRequest) {
     try {
-        const { email, password } = await req.json();
+        let { email, password } = await req.json();
 
         if (!email || !password) {
             return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
         }
 
+        email = email.trim();
+        password = password.trim();
+
         const admin = await queryOne('SELECT * FROM admins WHERE email = ?', [email]);
         if (!admin) {
+            console.log('Login failed: user not found for email', email);
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
         }
 
         const valid = bcrypt.compareSync(password, admin.password_hash);
         if (!valid) {
+            console.log('Login failed: password mismatch for user', email);
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
         }
 

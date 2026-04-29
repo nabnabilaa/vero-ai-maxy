@@ -13,25 +13,41 @@ async function seed() {
   });
 
   try {
-    const email = 'it.maxy.academy@gmail.com';
-    const password = 'timdeveloper1313';
+    const usersToSeed = [
+      {
+        email: 'it.maxy.academy@gmail.com',
+        password: 'timdeveloper1313',
+        name: 'Maxy Academy Admin',
+        industry: 'Education',
+        organization: 'Maxy Academy'
+      },
+      {
+        email: 'it@gmail.com',
+        password: '123123',
+        name: 'IT Admin Demo',
+        industry: 'Technology',
+        organization: 'IT Dept'
+      }
+    ];
 
-    // Check if user already exists
-    const [existing] = await pool.query('SELECT * FROM admins WHERE email = ?', [email]);
-    if (existing.length > 0) {
-      console.log('User already exists, skipping seeding.');
-      process.exit(0);
+    for (const user of usersToSeed) {
+      // Check if user already exists
+      const [existing] = await pool.query('SELECT * FROM admins WHERE email = ?', [user.email]);
+      if (existing.length > 0) {
+        console.log(`User ${user.email} already exists, skipping.`);
+        continue;
+      }
+
+      const passwordHash = await bcrypt.hash(user.password, 10);
+      const id = uuidv4();
+
+      await pool.query(
+        'INSERT INTO admins (id, email, password_hash, name, industry, organization) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, user.email, passwordHash, user.name, user.industry, user.organization]
+      );
+
+      console.log(`Successfully seeded ${user.email}!`);
     }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const id = uuidv4();
-
-    await pool.query(
-      'INSERT INTO admins (id, email, password_hash, name, industry, organization) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, email, passwordHash, 'Maxy Academy Admin', 'Education', 'Maxy Academy']
-    );
-
-    console.log('Successfully seeded Maxy Academy admin user!');
   } catch (error) {
     console.error('Seeding error:', error);
     process.exit(1);
