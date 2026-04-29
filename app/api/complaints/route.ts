@@ -24,24 +24,31 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    const body = await req.json();
-    const { conversationId, agentId, userName, userPhone, summary, details } = body;
+    try {
+        const body = await req.json();
+        const { conversationId, agentId, userName, userPhone, summary, details } = body;
 
-    // Get admin_id from agent
-    const agent = await queryOne('SELECT admin_id FROM agents WHERE id = ?', [agentId]);
-    if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+        if (!conversationId || !agentId) return NextResponse.json({ error: 'conversationId and agentId required' }, { status: 400 });
 
-    const id = uuidv4();
-    await execute(`
-    INSERT INTO complaints (id, conversation_id, agent_id, admin_id, user_name, user_phone, summary, details)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `, [id, conversationId, agentId, agent.admin_id, userName || '', userPhone || '', summary || '', details || '']);
+        // Get admin_id from agent
+        const agent = await queryOne('SELECT admin_id FROM agents WHERE id = ?', [agentId]);
+        if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
 
-    // Update conversation status
-    await execute(`UPDATE conversations SET is_complaint = 1, status = 'complaint', user_name = ?, user_phone = ? WHERE id = ?`,
-        [userName || '', userPhone || '', conversationId]);
+        const id = uuidv4();
+        await execute(`
+        INSERT INTO complaints (id, conversation_id, agent_id, admin_id, user_name, user_phone, summary, details)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [id, conversationId, agentId, agent.admin_id, userName || '', userPhone || '', summary || '', details || '']);
 
-    return NextResponse.json({ id, success: true }, { status: 201 });
+        // Update conversation status
+        await execute(`UPDATE conversations SET is_complaint = 1, status = 'complaint', user_name = ?, user_phone = ? WHERE id = ?`,
+            [userName || '', userPhone || '', conversationId]);
+
+        return NextResponse.json({ id, success: true }, { status: 201 });
+    } catch (error: any) {
+        console.error('Complaint POST error:', error);
+        return NextResponse.json({ error: 'Failed to submit complaint. Please try again.' }, { status: 500 });
+    }
 }
 
 export async function PUT(req: NextRequest) {

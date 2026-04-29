@@ -5,7 +5,7 @@ export type Message = {
   timestamp: Date;
   showMap?: boolean;
   mapQuery?: string;
-  isVoice?: boolean;
+
   imageUrl?: string;
   showWhatsApp?: boolean;
   whatsAppText?: string;
@@ -24,7 +24,7 @@ export type AgentData = {
   instructions: string;
   goal: string;
   industry: string;
-  voice_type?: string;
+
   quick_actions?: string;
 };
 

@@ -25,31 +25,36 @@ export async function POST(req: NextRequest) {
 
 // GET — aggregate ratings for dashboard
 export async function GET(req: NextRequest) {
-    const { searchParams } = new URL(req.url);
-    const agentId = searchParams.get('agentId');
+    try {
+        const { searchParams } = new URL(req.url);
+        const agentId = searchParams.get('agentId');
 
-    if (!agentId) {
-        return NextResponse.json({ error: 'agentId required' }, { status: 400 });
+        if (!agentId) {
+            return NextResponse.json({ error: 'agentId required' }, { status: 400 });
+        }
+
+        const stats = await query(`
+            SELECT 
+                COUNT(*) as total_ratings,
+                ROUND(AVG(rating), 1) as avg_rating,
+                SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) as positive,
+                SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END) as negative
+            FROM conversation_ratings WHERE agent_id = ?
+        `, [agentId]);
+
+        const recent = await query(`
+            SELECT rating, feedback, created_at 
+            FROM conversation_ratings 
+            WHERE agent_id = ? 
+            ORDER BY created_at DESC LIMIT 20
+        `, [agentId]);
+
+        return NextResponse.json({
+            stats: stats[0] || {},
+            recent,
+        });
+    } catch (error: any) {
+        console.error('Ratings GET error:', error);
+        return NextResponse.json({ error: 'Failed to fetch ratings.' }, { status: 500 });
     }
-
-    const stats = await query(`
-        SELECT 
-            COUNT(*) as total_ratings,
-            ROUND(AVG(rating), 1) as avg_rating,
-            SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) as positive,
-            SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END) as negative
-        FROM conversation_ratings WHERE agent_id = ?
-    `, [agentId]);
-
-    const recent = await query(`
-        SELECT rating, feedback, created_at 
-        FROM conversation_ratings 
-        WHERE agent_id = ? 
-        ORDER BY created_at DESC LIMIT 20
-    `, [agentId]);
-
-    return NextResponse.json({
-        stats: stats[0] || {},
-        recent,
-    });
 }

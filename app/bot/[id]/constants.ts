@@ -52,20 +52,6 @@ export const facilityKw = [
   '设施', '客房', '游泳池', '早餐', '停车场',
 ];
 
-// BCP-47 language codes for TTS/STT
-export const langCodeMap: Record<string, string> = {
-  Indonesian: 'id-ID',
-  English: 'en-US',
-  Korean: 'ko-KR',
-  Japanese: 'ja-JP',
-  Mandarin: 'zh-CN',
-  Spanish: 'es-ES',
-  Arabic: 'ar-SA',
-  French: 'fr-FR',
-  German: 'de-DE',
-  Russian: 'ru-RU',
-  Portuguese: 'pt-BR',
-};
 
 export const LANGUAGES = [
   { name: 'Indonesian', label: 'ID', flag: '🇮🇩', greeting: 'Halo! Ada yang bisa saya bantu hari ini?' },

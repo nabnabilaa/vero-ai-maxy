@@ -41,13 +41,7 @@ export default function LoginPage() {
         }
     };
 
-    const demoAccounts = [
-        { label: '🏨 Hotel', email: 'hotel@vero.ai' },
-        { label: '🛒 Retail', email: 'retail@vero.ai' },
-        { label: '🍽️ Restaurant', email: 'restaurant@vero.ai' },
-        { label: '🏠 Real Estate', email: 'realestate@vero.ai' },
-        { label: '⚡ General', email: 'admin@vero.ai' },
-    ];
+
 
     return (
         <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
@@ -92,7 +86,7 @@ export default function LoginPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent transition-all backdrop-blur-sm"
-                                placeholder="admin@vero.ai"
+                                placeholder="youremail@example.com"
                                 required
                             />
                         </div>
@@ -135,25 +129,7 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    {/* Demo Accounts */}
-                    <div className="mt-6 pt-6 border-t border-white/10">
-                        <p className="text-xs text-blue-200/50 text-center mb-3">Quick Login (Demo)</p>
-                        <div className="flex flex-wrap gap-2 justify-center">
-                            {demoAccounts.map((acc) => (
-                                <button
-                                    key={acc.email}
-                                    type="button"
-                                    onClick={() => {
-                                        setEmail(acc.email);
-                                        setPassword('admin123');
-                                    }}
-                                    className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg text-blue-200/80 transition-all hover:scale-105"
-                                >
-                                    {acc.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+
                 </div>
 
                 <p className="text-center text-blue-300/30 text-xs mt-6">Powered by Maxy Academy × Gemini AI</p>

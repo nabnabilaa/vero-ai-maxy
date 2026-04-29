@@ -186,13 +186,13 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><Building2 className="w-3.5 h-3.5" /> {t('settings.business.name')}</label>
-              <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+              <input type="text" maxLength={255} className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                 placeholder={t('settings.business.namePlaceholder')} value={generalInfo.business_name}
                 onChange={(e) => setGeneralInfo(prev => ({ ...prev, business_name: e.target.value }))} />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> {t('settings.business.city')}</label>
-              <input type="text" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+              <input type="text" maxLength={255} className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                 placeholder={t('settings.business.cityPlaceholder')} value={generalInfo.city}
                 onChange={(e) => setGeneralInfo(prev => ({ ...prev, city: e.target.value }))} />
             </div>
@@ -200,7 +200,7 @@ export default function SettingsPage() {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {t('settings.business.address')}</label>
-            <textarea className="w-full h-20 rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+            <textarea maxLength={1000} className="w-full h-20 rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
               placeholder={t('settings.business.addressPlaceholder')} value={generalInfo.address}
               onChange={(e) => setGeneralInfo(prev => ({ ...prev, address: e.target.value }))} />
           </div>
@@ -214,7 +214,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> {t('settings.business.email')}</label>
-              <input type="email" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+              <input type="email" maxLength={255} className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                 placeholder={t('settings.business.emailPlaceholder')} value={generalInfo.email}
                 onChange={(e) => setGeneralInfo(prev => ({ ...prev, email: e.target.value }))} />
             </div>
@@ -223,7 +223,7 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><LinkIcon className="w-3.5 h-3.5" /> {t('settings.business.website')}</label>
-              <input type="url" className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+              <input type="url" maxLength={2000} className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                 placeholder={t('settings.business.websitePlaceholder')} value={generalInfo.website}
                 onChange={(e) => setGeneralInfo(prev => ({ ...prev, website: e.target.value }))} />
             </div>
@@ -251,7 +251,7 @@ export default function SettingsPage() {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">{t('settings.business.description')}</label>
-            <textarea className="w-full h-24 rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+            <textarea maxLength={2000} className="w-full h-24 rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
               placeholder={t('settings.business.descriptionPlaceholder')}
               value={generalInfo.description}
               onChange={(e) => setGeneralInfo(prev => ({ ...prev, description: e.target.value }))} />
